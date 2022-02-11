@@ -266,6 +266,7 @@ struct xgq_cmd_cq {
 	};
 	uint32_t rcode;
 };
+
 XGQ_STATIC_ASSERT(sizeof(struct xgq_cmd_cq) == 16, "xgq_cmd_cq has to be 16 bytes in size");
 
 /**
