@@ -614,6 +614,9 @@ static int zert_versal_init(struct zocl_ctrl_ert *zert)
 
 	/* TODO: Bringup INTC sub-dev to handle interrupts for all CUs. */
 
+	/* Initialize soft kernel data structure */
+	zocl_init_soft_kernel(zocl_get_zdev());
+
 	return 0;
 }
 
