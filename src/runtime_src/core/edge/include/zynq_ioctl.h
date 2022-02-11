@@ -439,6 +439,8 @@ struct drm_zocl_sk_getcmd {
 	uint32_t	cu_nums;
 	char		name[ZOCL_MAX_NAME_LENGTH];
 	uint32_t	bohdl;
+	uint32_t	meta_bohdl;
+	char		uuid[16];
 };
 
 enum aie_info_code {
@@ -487,6 +489,7 @@ enum drm_zocl_scu_state {
  */
 struct drm_zocl_sk_report {
 	uint32_t		cu_idx;
+	uint32_t		cu_domain;
 	enum drm_zocl_scu_state	cu_state;
 };
 

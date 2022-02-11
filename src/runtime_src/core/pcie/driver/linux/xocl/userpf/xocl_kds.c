@@ -489,7 +489,7 @@ static bool copy_and_validate_execbuf(struct xocl_dev *xdev,
 	if (kds->xgq_enable)
 		return true;
 
-	if (!kds->ert_disable && (kds->ert->slot_size < pkg_size)) {
+	if ((kds->ert->slot_size > 0) && (kds->ert->slot_size < pkg_size)) {
 		userpf_err(xdev, "payload size bigger than CQ slot size\n");
 		return false;
 	}
@@ -531,6 +531,16 @@ static int xocl_fill_payload_xgq(struct xocl_dev *xdev, struct kds_command *xcmd
 		 */
 		xcmd->status = KDS_COMPLETED;
 		xcmd->cb.notify_host(xcmd, xcmd->status);
+		break;
+	case ERT_SK_START:
+		kecmd = (struct ert_start_kernel_cmd *)xcmd->execbuf;
+		xcmd->type = KDS_SCU;
+		xcmd->opcode = OP_START;
+		xcmd->cu_mask[0] = kecmd->cu_mask;
+		memcpy(&xcmd->cu_mask[1], kecmd->data, kecmd->extra_cu_masks);
+		xcmd->num_mask = 1 + kecmd->extra_cu_masks;
+		xcmd->isize = xgq_exec_convert_start_cu_cmd(xcmd->info, kecmd);
+		ret = 1; /* hack */
 		break;
 	case ERT_START_CU:
 		kecmd = (struct ert_start_kernel_cmd *)xcmd->execbuf;
@@ -1304,7 +1314,66 @@ xocl_kds_fill_cu_info(struct xocl_dev *xdev, struct xrt_cu_info *cu_info,
 	 * - protocol
 	 */
 	XOCL_GET_IP_LAYOUT(xdev, ip_layout);
+	if (!ip_layout)
+ 		goto done;
+
 	num_cus = kds_ip_layout2cu_info(ip_layout, cu_info, num_info);
+
+	/*
+	 * Get CU metadata from XML,
+	 * - map size
+	 * - number of arguments
+	 * - arguments list
+	 * - misc: software, number of resourse ...
+	 */
+	for (i = 0; i < num_cus; i++) {
+		cu_info[i].model = XCU_AUTO;
+		cu_info[i].size = 0x1000;
+		cu_info[i].sw_reset = false;
+		cu_info[i].num_res = 1;
+		cu_info[i].num_args = 0;
+		cu_info[i].args = NULL;
+
+		krnl_info = xocl_query_kernel(xdev, cu_info[i].kname);
+		if (!krnl_info) {
+			/* Workaround for U30, maybe we can remove this in the future */
+			userpf_info(xdev, "%s has no metadata. Use default", cu_info[i].kname);
+			continue;
+		}
+
+		cu_info[i].size = krnl_info->range;
+		cu_info[i].sw_reset = false;
+		if (krnl_info->features & KRNL_SW_RESET)
+			cu_info[i].sw_reset = true;
+
+		cu_info[i].num_res = 1;
+		cu_info[i].num_args = krnl_info->anums;
+		cu_info[i].args = (struct xrt_cu_arg *)krnl_info->args;
+	}
+
+done:
+ 	XOCL_PUT_IP_LAYOUT(xdev);
+	return num_cus;
+}
+
+static int
+xocl_kds_fill_scu_info(struct xocl_dev *xdev, struct xrt_cu_info *cu_info,
+		      int num_info)
+{
+	struct ip_layout *ip_layout = NULL;
+	struct kernel_info *krnl_info = NULL;
+	int num_cus = 0;
+	int i = 0;
+
+	/*
+	 * Get CU metadata from ip_layout:
+	 * - CU name
+	 * - base address
+	 * - interrupt
+	 * - protocol
+	 */
+	XOCL_GET_IP_LAYOUT(xdev, ip_layout);
+	num_cus = kds_ip_layout2scu_info(ip_layout, cu_info, num_info);
 	XOCL_PUT_MEM_TOPOLOGY(xdev);
 
 	/*
@@ -1358,6 +1427,23 @@ xocl_kds_create_cus(struct xocl_dev *xdev, struct xrt_cu_info *cu_info,
 		subdev_info.override_idx = i;
 		if (xocl_subdev_create(xdev, &subdev_info))
 			userpf_info(xdev, "Create CU %s failed. Skip", cu_info[i].iname);
+	}
+}
+
+static void
+xocl_kds_create_scus(struct xocl_dev *xdev, struct xrt_cu_info *cu_info,
+		    int num_cus)
+{
+	int i = 0;
+
+	for (i = 0; i < num_cus; i++) {
+		struct xocl_subdev_info subdev_info = XOCL_DEVINFO_SCU;
+
+		subdev_info.priv_data = &cu_info[i];
+		subdev_info.data_len = sizeof(struct xrt_cu_info);
+		subdev_info.override_idx = i;
+		if (xocl_subdev_create(xdev, &subdev_info))
+			userpf_info(xdev, "Create SCU %s failed. Skip", cu_info[i].iname);
 	}
 }
 
@@ -1418,7 +1504,7 @@ static void xocl_kds_xgq_notify(struct kds_command *xcmd, int status)
 }
 
 static int
-xocl_kds_xgq_cfg_start(struct xocl_dev *xdev, struct drm_xocl_kds cfg, int num_cus)
+xocl_kds_xgq_cfg_start(struct xocl_dev *xdev, struct drm_xocl_kds cfg, int num_cus, int num_scus)
 {
 	struct xgq_cmd_config_start *cfg_start = NULL;
 	struct xgq_cmd_resp_config_start resp = {0};
@@ -1445,6 +1531,7 @@ xocl_kds_xgq_cfg_start(struct xocl_dev *xdev, struct drm_xocl_kds cfg, int num_c
 	cfg_start->mode = 0;
 	cfg_start->echo = 0;
 	cfg_start->verbose = 0;
+	cfg_start->num_scus = num_scus;
 
 	xcmd->cb.notify_host = xocl_kds_xgq_notify;
 	xcmd->cb.free = kds_free_command;
@@ -1519,8 +1606,16 @@ xocl_kds_xgq_cfg_cu(struct xocl_dev *xdev, struct xrt_cu_info *cu_info, int num_
 	struct kds_sched *kds = &XDEV(xdev)->kds;
 	struct kds_client *client = NULL;
 	struct kds_command *xcmd = NULL;
+	xuid_t *xclbin_id = NULL;
 	int ret = 0;
 	int i = 0, j = 0;
+
+	/* TODO: ICAP will pass UUID to KDS, instead of fetch it */
+ 	ret = XOCL_GET_XCLBIN_ID(xdev, xclbin_id);
+ 	if (ret) {
+ 		userpf_err(xdev, "Unable to get on device uuid %d", ret);
+ 		return -EINVAL;
+ 	}
 
 	for (i = 0; i < num_cus; i++) {
 		int max_off_idx = 0;
@@ -1529,8 +1624,10 @@ xocl_kds_xgq_cfg_cu(struct xocl_dev *xdev, struct xrt_cu_info *cu_info, int num_
 
 		client = kds->anon_client;
 		xcmd = kds_alloc_command(client, sizeof(struct xgq_cmd_config_cu));
-		if (!xcmd)
+		if (!xcmd) {
+			XOCL_PUT_XCLBIN_ID(xdev);
 			return -ENOMEM;
+		}
 
 		cfg_cu = xcmd->info;
 		cfg_cu->hdr.opcode = XGQ_CMD_OP_CFG_CU;
@@ -1565,6 +1662,8 @@ xocl_kds_xgq_cfg_cu(struct xocl_dev *xdev, struct xrt_cu_info *cu_info, int num_
 		scnprintf(cfg_cu->name, sizeof(cfg_cu->name), "%s:%s",
 			  cu_info[i].kname, cu_info[i].iname);
 
+		memcpy(cfg_cu->uuid, xclbin_id, sizeof(cfg_cu->uuid));
+
 		xcmd->cb.notify_host = xocl_kds_xgq_notify;
 		xcmd->cb.free = kds_free_command;
 		xcmd->priv = kds;
@@ -1584,6 +1683,69 @@ xocl_kds_xgq_cfg_cu(struct xocl_dev *xdev, struct xrt_cu_info *cu_info, int num_
 			break;
 		}
 		userpf_info(xdev, "Config CU(%d) completed\n", cfg_cu->cu_idx);
+	}
+
+	XOCL_PUT_XCLBIN_ID(xdev);
+	return ret;
+}
+
+static int
+xocl_kds_xgq_cfg_scu(struct xocl_dev *xdev, struct xrt_cu_info *cu_info, int num_cus)
+{
+	struct xgq_cmd_config_cu *cfg_cu = NULL;
+	struct xgq_com_queue_entry resp = {0};
+	struct kds_sched *kds = &XDEV(xdev)->kds;
+	struct kds_client *client = NULL;
+	struct kds_command *xcmd = NULL;
+	int ret = 0;
+	int i = 0, j = 0;
+
+	for (i = 0; i < num_cus; i++) {
+		int max_off_idx = 0;
+		int max_off = 0;
+
+		client = kds->anon_client;
+		xcmd = kds_alloc_command(client, sizeof(struct xgq_cmd_config_cu));
+		if (!xcmd)
+			return -ENOMEM;
+
+		cfg_cu = xcmd->info;
+		cfg_cu->hdr.opcode = XGQ_CMD_OP_CFG_CU;
+		cfg_cu->hdr.count = sizeof(*cfg_cu) - sizeof(cfg_cu->hdr);
+		cfg_cu->hdr.state = 1;
+
+		cfg_cu->cu_idx = i;
+		cfg_cu->ip_ctrl = cu_info[i].protocol;
+		cfg_cu->map_size = cu_info[i].size;
+		cfg_cu->laddr = cu_info[i].addr;
+		cfg_cu->haddr = cu_info[i].addr >> 32;
+		for (j = 0; j < cu_info[i].num_args; j++) {
+			if (max_off < cu_info[i].args[j].offset) {
+				max_off = cu_info[i].args[j].offset;
+				max_off_idx = j;
+			}
+		}
+		cfg_cu->payload_size = max_off + cu_info[i].args[max_off_idx].size;
+		scnprintf(cfg_cu->name, sizeof(cfg_cu->name), "%s:%s",
+			  cu_info[i].kname, cu_info[i].iname);
+
+		xcmd->cb.notify_host = xocl_kds_xgq_notify;
+		xcmd->cb.free = kds_free_command;
+		xcmd->priv = kds;
+		xcmd->type = KDS_ERT;
+		xcmd->opcode = OP_CONFIG;
+		xcmd->response = &resp;
+		xcmd->response_size = sizeof(resp);
+
+		ret = kds_submit_cmd_and_wait(kds, xcmd);
+		if (ret)
+			break;
+
+		if (xcmd->status != KDS_COMPLETED) {
+			userpf_err(xdev, "Configure XGQ ERT failed");
+			ret = -EINVAL;
+			break;
+		}
 	}
 
 	return ret;
@@ -1640,6 +1802,8 @@ static int xocl_kds_update_xgq(struct xocl_dev *xdev, struct drm_xocl_kds cfg)
 {
 	struct xrt_cu_info *cu_info = NULL;
 	int num_cus = 0;
+	struct xrt_cu_info *scu_info = NULL;
+	int num_scus = 0;
 	int ret = 0;
 	int i = 0;
 
@@ -1653,11 +1817,27 @@ static int xocl_kds_update_xgq(struct xocl_dev *xdev, struct drm_xocl_kds cfg)
 	if (!XDEV(xdev)->kds.ert)
 		goto create_regular_cu;
 
-	ret = xocl_kds_xgq_cfg_start(xdev, cfg, num_cus);
+	if (!cfg.ert) {
+ 		XDEV(xdev)->kds.ert_disable = true;
+ 		goto create_regular_cu;
+ 	}
+
+ 	if (ret)
+ 		goto create_regular_cu;
+
+	// Soft Kernel Info
+	scu_info = kzalloc(MAX_CUS * sizeof(struct xrt_cu_info), GFP_KERNEL);
+	if (!scu_info)
+		return -ENOMEM;
+	num_scus = xocl_kds_fill_scu_info(xdev, scu_info, MAX_CUS);
+
+ 	ret = xocl_kds_xgq_cfg_start(xdev, cfg, num_cus, num_scus);
+
+	ret = xocl_kds_xgq_cfg_cu(xdev, cu_info, num_cus);
 	if (ret)
 		goto create_regular_cu;
 
-	ret = xocl_kds_xgq_cfg_cu(xdev, cu_info, num_cus);
+	ret = xocl_kds_xgq_cfg_scu(xdev, scu_info, num_scus);
 	if (ret)
 		goto create_regular_cu;
 
@@ -1687,6 +1867,26 @@ static int xocl_kds_update_xgq(struct xocl_dev *xdev, struct drm_xocl_kds cfg)
 		cu_info[i].xgq = xgq;
 	}
 	xocl_kds_create_cus(xdev, cu_info, num_cus);
+
+	// User Soft Kernels
+	for (i = 0; i < num_scus; i++) {
+		struct xgq_cmd_resp_query_cu resp;
+		void *xgq;
+
+		ret = xocl_kds_xgq_query_cu(xdev, i, &resp);
+		if (ret)
+			goto create_regular_cu;
+
+		xgq = xocl_ert_ctrl_setup_xgq(xdev, resp.xgq_id, resp.offset);
+		if (IS_ERR(xgq)) {
+			userpf_err(xdev, "Setup XGQ failed\n");
+			ret = PTR_ERR(xgq);
+			goto create_regular_cu;
+		}
+		cu_info[i].model = XCU_XGQ;
+		cu_info[i].xgq = xgq;
+	}
+	xocl_kds_create_scus(xdev, cu_info, num_scus);
 
 	XDEV(xdev)->kds.xgq_enable = (cfg.ert)? true : false;
 	goto out;

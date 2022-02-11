@@ -278,12 +278,13 @@ out:
 	return ret;
 }
 
-int zocl_add_context_kernel(struct drm_zocl_dev *zdev, void *client_hdl, u32 cu_idx, u32 flags)
+int zocl_add_context_kernel(struct drm_zocl_dev *zdev, void *client_hdl, u32 cu_idx, u32 flags, u32 cu_domain)
 {
 	int ret = 0;
 	struct kds_ctx_info info = { 0 };
 	struct kds_client *client = (struct kds_client *)client_hdl;
 
+	info.cu_domain = cu_domain;
 	info.cu_idx = cu_idx;
 	info.flags = flags;
 
@@ -293,12 +294,13 @@ int zocl_add_context_kernel(struct drm_zocl_dev *zdev, void *client_hdl, u32 cu_
 	return ret;
 }
 
-int zocl_del_context_kernel(struct drm_zocl_dev *zdev, void *client_hdl, u32 cu_idx)
+int zocl_del_context_kernel(struct drm_zocl_dev *zdev, void *client_hdl, u32 cu_idx, u32 cu_domain)
 {
 	int ret = 0;
 	struct kds_ctx_info info = { 0 };
 	struct kds_client *client = (struct kds_client *)client_hdl;
 
+	info.cu_domain = cu_domain;
 	info.cu_idx = cu_idx;
 	mutex_lock(&client->lock);
 	ret = kds_del_context(&zdev->kds, client, &info);
@@ -807,7 +809,6 @@ void zocl_destroy_client(void *client_hdl)
 	struct drm_zocl_dev *zdev = zocl_get_zdev();
 	struct kds_client *client = (struct kds_client *)client_hdl;
 	struct kds_sched  *kds = NULL;
-	struct drm_device *ddev = NULL;
 	struct kds_client_ctx *curr = NULL;
 	struct drm_zocl_slot *slot = NULL;
 	int pid = pid_nr(client->pid);
