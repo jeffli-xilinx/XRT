@@ -168,6 +168,7 @@ static void cu_conf2info(struct xgq_cmd_config_cu *conf, struct xrt_cu_info *inf
 	info->size = conf->map_size;
 	info->intr_enable = 0;
 	info->intr_id = 0;
+	info->slot_idx = 0;
 	info->protocol = conf->ip_ctrl;
 	if (info->protocol == CTRL_FA)
 		info->model = XCU_FA;

@@ -783,8 +783,8 @@ zocl_xclbin_load_pdi(struct drm_zocl_dev *zdev, void *data,
 
 	count = xrt_xclbin_get_section_num(axlf, SOFT_KERNEL);
 	if (count > 0) {
-//		zocl_cache_xclbin(slot, axlf, xclbin);
-		ret = zocl_load_pskernel(zdev, axlf);
+		zocl_cache_xclbin(slot, axlf, xclbin);
+		ret = zocl_load_pskernel(zdev, slot->axlf);
 		if (ret)
 			goto out;
 	}
