@@ -668,6 +668,9 @@ static int zert_mpsoc_init(struct zocl_ctrl_ert *zert)
 	if (ret)
 		zert_err(zert, "Failed to create xgq intc device: %d", ret);
 
+	/* Initialize soft kernel data structure */
+	zocl_init_soft_kernel(zocl_get_zdev());
+	
 	return 0;
 }
 
@@ -814,7 +817,6 @@ static void zert_cmd_cfg_start(struct zocl_ctrl_ert *zert, struct xgq_cmd_sq_hdr
 
 	zert_destroy_cus(zert);
 	zert_destroy_cu_xgqs(zert);
-	zocl_fini_soft_kernel(zocl_get_zdev());
 	kds_reset(&zocl_get_zdev()->kds);
 	zert->zce_config_completed = false;
 
@@ -824,7 +826,6 @@ static void zert_cmd_cfg_start(struct zocl_ctrl_ert *zert, struct xgq_cmd_sq_hdr
 	zert->zce_num_scus = c->num_scus;
 	zert->zce_echo_mode = c->echo;
 	zert_init_cus(zert);
-	zocl_init_soft_kernel(zocl_get_zdev());
 	
 	init_resp(resp, cmd->cid, 0);
 	r->i2h = true;
