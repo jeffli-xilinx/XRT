@@ -45,7 +45,7 @@ install_recipes()
         echo "inherit externalsrc" > $XRT_BB
         echo "EXTERNALSRC = \"$XRT_REPO_DIR/src\"" >> $XRT_BB
         echo 'EXTERNALSRC_BUILD = "${WORKDIR}/build"' >> $XRT_BB
-        echo "FILES:\${PN} += \"\${libdir}/ps_kernels_lib\"" >> $XRT_BB
+#        echo "FILES:\${PN} += \"\${libdir}/ps_kernels_lib\"" >> $XRT_BB
         echo 'PACKAGE_CLASSES = "package_rpm"' >> $XRT_BB
         echo 'LICENSE = "GPLv2 & Apache-2.0"' >> $XRT_BB
         echo 'LIC_FILES_CHKSUM = "file://../LICENSE;md5=da5408f748bce8a9851dac18e66f4bcf \' >> $XRT_BB
@@ -68,6 +68,8 @@ install_recipes()
         echo '  modprobe zocl' >> $ZOCL_BB
         echo '}' >> $ZOCL_BB
     fi
+    cp -rf ${THIS_SCRIPT_DIR}/pskernel/recipes-xrt/xrt/xrt_%.bbappend $XRT_BB
+    cp -rf ${THIS_SCRIPT_DIR}/pskernel/recipes-xrt/zocl/zocl_%.bbappend $ZOCL_BB
     eval "$SAVED_OPTIONS_LOCAL"
 }
 
@@ -225,7 +227,11 @@ fi
 source $PETALINUX/settings.sh 
 
 if [[ $AARCH = $aarch64_dir ]]; then
-    if [[ -f $PETALINUX/../../bsp/release/zynqmp-common-v$PETALINUX_VER-final.bsp ]]; then
+#    if [[ -f ${THIS_SCRIPT_DIR}/u30_rap_1223.bsp ]]; then
+#    PETA_BSP="${THIS_SCRIPT_DIR}/u30_rap_1223.bsp"
+    if [[ -f $PETALINUX/../../bsp/release/xilinx-zcu102-v$PETALINUX_VER-final.bsp ]]; then
+    PETA_BSP="$PETALINUX/../../bsp/release/xilinx-zcu102-v$PETALINUX_VER-final.bsp"
+    elif [[ -f $PETALINUX/../../bsp/release/zynqmp-common-v$PETALINUX_VER-final.bsp ]]; then
     PETA_BSP="$PETALINUX/../../bsp/release/zynqmp-common-v$PETALINUX_VER-final.bsp"
     elif [[ -f $PETALINUX/../../bsp/internal/zynqmp/zynqmp-common-v$PETALINUX_VER-final.bsp ]]; then
     PETA_BSP="$PETALINUX/../../bsp/internal/zynqmp/zynqmp-common-v$PETALINUX_VER-final.bsp"
@@ -300,6 +306,8 @@ cd $ORIGINAL_DIR/$PETALINUX_NAME
 echo "CONFIG_YOCTO_MACHINE_NAME=\"${YOCTO_MACHINE}\""
 echo "CONFIG_YOCTO_MACHINE_NAME=\"${YOCTO_MACHINE}\"" >> project-spec/configs/config 
 
+echo "CONFIG_TMP_DIR_LOCATION=\"/scratch/${USER}/petalinux-top/$PETALINUX_VER\""
+echo "CONFIG_TMP_DIR_LOCATION=\"/scratch/${USER}/petalinux-top/$PETALINUX_VER\"" >> project-spec/configs/config 
 
 if [ ! -z $SSTATE_CACHE ] && [ -d $SSTATE_CACHE ]; then
     echo "SSTATE-CACHE:${SSTATE_CACHE} added"

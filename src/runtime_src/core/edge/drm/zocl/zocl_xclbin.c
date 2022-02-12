@@ -201,6 +201,10 @@ zocl_load_pskernel(struct drm_zocl_dev *zdev, struct axlf *axlf)
 	if(header) {
 		DRM_INFO("Found EMBEDDED_METADATA section\n");
 		DRM_INFO("EMBEDDED_METADATA section size = %d\n",header->m_sectionSize);
+	} else {
+		DRM_ERROR("EMBEDDED_METADATA section not found!\n");
+		mutex_unlock(&sk->sk_lock);
+		return -EINVAL;
 	}
 	sk->sk_meta_bo = zocl_drm_create_bo(zdev->ddev, header->m_sectionSize,
 					    ZOCL_BO_FLAGS_CMA);
@@ -789,8 +793,8 @@ zocl_xclbin_load_pdi(struct drm_zocl_dev *zdev, void *data,
 
 	count = xrt_xclbin_get_section_num(axlf, SOFT_KERNEL);
 	if (count > 0) {
-//		zocl_cache_xclbin(slot, axlf, xclbin);
-		ret = zocl_load_pskernel(zdev, axlf);
+		zocl_cache_xclbin(slot, axlf, xclbin);
+		ret = zocl_load_pskernel(zdev, slot->axlf);
 		if (ret)
 			goto out;
 	}
@@ -822,7 +826,7 @@ out:
 int
 zocl_xclbin_load_pskernel(struct drm_zocl_dev *zdev, void *data)
 {
-        struct axlf *axlf = data;
+        struct axlf *axlf = (struct axlf *)data;
         struct axlf *axlf_head = axlf;
 	struct drm_zocl_slot *slot;
         char *xclbin = NULL;

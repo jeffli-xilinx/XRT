@@ -1,1 +1,2 @@
 PETALINUX="/proj/petalinux/2022.1/petalinux-v2022.1_01312336/tool/petalinux-v2022.1-final"
+#PETALINUX="/proj/petalinux/2019.2/petalinux-v2019.2_daily_latest/tool/petalinux-v2019.2-final"
