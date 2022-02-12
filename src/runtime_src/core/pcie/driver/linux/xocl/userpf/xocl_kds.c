@@ -1408,6 +1408,8 @@ xocl_kds_fill_scu_info(struct xocl_dev *xdev, struct xrt_cu_info *cu_info,
 		cu_info[i].args = (struct xrt_cu_arg *)krnl_info->args;
 	}
 
+done:
+	XOCL_PUT_IP_LAYOUT(xdev);
 	return num_cus;
 }
 
@@ -1611,11 +1613,11 @@ xocl_kds_xgq_cfg_cu(struct xocl_dev *xdev, struct xrt_cu_info *cu_info, int num_
 	int i = 0, j = 0;
 
 	/* TODO: ICAP will pass UUID to KDS, instead of fetch it */
- 	ret = XOCL_GET_XCLBIN_ID(xdev, xclbin_id);
- 	if (ret) {
- 		userpf_err(xdev, "Unable to get on device uuid %d", ret);
- 		return -EINVAL;
- 	}
+	ret = XOCL_GET_XCLBIN_ID(xdev, xclbin_id);
+	if (ret) {
+		userpf_err(xdev, "Unable to get on device uuid %d", ret);
+		return -EINVAL;
+	}
 
 	for (i = 0; i < num_cus; i++) {
 		int max_off_idx = 0;

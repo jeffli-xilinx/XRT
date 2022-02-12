@@ -218,7 +218,7 @@ enum CU_PROTOCOL {
 struct xrt_cu_info {
 	u32			 model;
 	int			 cu_idx;
-	int			 slot_idx;
+	u32			 slot_idx;
 	int			 inst_idx;
 	u64			 addr;
 	size_t			 size;
@@ -230,8 +230,8 @@ struct xrt_cu_info {
 	bool			 sw_reset;
 	struct xrt_cu_arg	*args;
 	u32			 num_args;
-	char			 iname[32];
-	char			 kname[32];
+	char			 iname[64];
+	char			 kname[64];
 	void			*xgq;
 	int			 cu_domain;
 };
