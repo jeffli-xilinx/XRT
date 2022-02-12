@@ -198,6 +198,10 @@ zocl_load_pskernel(struct drm_zocl_dev *zdev, struct axlf *axlf)
 	sk->sk_nimg = count;
 	sk->sk_img = kzalloc(sizeof(struct scu_image) * count, GFP_KERNEL);
 	header = xrt_xclbin_get_section_hdr_next(axlf, EMBEDDED_METADATA, header);
+	if(header) {
+		DRM_INFO("Found EMBEDDED_METADATA section\n");
+		DRM_INFO("EMBEDDED_METADATA section size = %d\n",header->m_sectionSize);
+	}
 	sk->sk_meta_bo = zocl_drm_create_bo(zdev->ddev, header->m_sectionSize,
 					    ZOCL_BO_FLAGS_CMA);
 	if (IS_ERR(sk->sk_meta_bo)) {
@@ -215,6 +219,7 @@ zocl_load_pskernel(struct drm_zocl_dev *zdev, struct axlf *axlf)
 
 	header = xrt_xclbin_get_section_hdr_next(axlf, SOFT_KERNEL, header);
 	while (header) {
+		DRM_INFO("Found soft kernel %d\n",sec_idx);
 		struct soft_kernel *sp =
 		    (struct soft_kernel *)&xclbin[header->m_sectionOffset];
 		char *begin = (char *)sp;
