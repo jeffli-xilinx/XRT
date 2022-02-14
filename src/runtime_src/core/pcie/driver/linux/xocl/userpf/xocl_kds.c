@@ -1373,8 +1373,9 @@ xocl_kds_fill_scu_info(struct xocl_dev *xdev, struct xrt_cu_info *cu_info,
 	 * - protocol
 	 */
 	XOCL_GET_IP_LAYOUT(xdev, ip_layout);
+	if (!ip_layout)
+ 		goto done;
 	num_cus = kds_ip_layout2scu_info(ip_layout, cu_info, num_info);
-	XOCL_PUT_MEM_TOPOLOGY(xdev);
 
 	/*
 	 * Get CU metadata from XML,
@@ -1387,7 +1388,7 @@ xocl_kds_fill_scu_info(struct xocl_dev *xdev, struct xrt_cu_info *cu_info,
 		cu_info[i].model = XCU_AUTO;
 		cu_info[i].size = 0x1000;
 		cu_info[i].sw_reset = false;
-		cu_info[i].num_res = 1;
+		cu_info[i].num_res = 0;
 		cu_info[i].num_args = 0;
 		cu_info[i].args = NULL;
 
@@ -1403,7 +1404,7 @@ xocl_kds_fill_scu_info(struct xocl_dev *xdev, struct xrt_cu_info *cu_info,
 		if (krnl_info->features & KRNL_SW_RESET)
 			cu_info[i].sw_reset = true;
 
-		cu_info[i].num_res = 1;
+		cu_info[i].num_res = 0;
 		cu_info[i].num_args = krnl_info->anums;
 		cu_info[i].args = (struct xrt_cu_arg *)krnl_info->args;
 	}

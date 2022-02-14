@@ -1884,7 +1884,7 @@ int kds_ip_layout2scu_info(struct ip_layout *ip_layout, struct xrt_cu_info cu_in
 
 		info.addr = 0;
 		info.intr_enable = 0;
-		info.protocol = (ip->properties & IP_CONTROL_MASK) >> IP_CONTROL_SHIFT;
+		info.protocol = CTRL_HS;
 		info.intr_id = 0;
 
 		memcpy(&cu_info[num_cus], &info, sizeof(info));
