@@ -174,7 +174,7 @@ static void cu_conf2info(struct xgq_cmd_config_cu *conf, struct xrt_cu_info *inf
 		info->model = XCU_FA;
 	else
 		info->model = XCU_HLS;
-	info->cu_domain = conf->domain;
+	info->cu_domain = conf->cu_domain;
 	info->inst_idx = conf->cu_idx;
 	strcpy(info->kname, strsep(&kname_p, ":"));
 	strcpy(info->iname, strsep(&kname_p, ":"));
@@ -890,7 +890,7 @@ static void zert_cmd_query_cu(struct zocl_ctrl_ert *zert, struct xgq_cmd_sq_hdr 
 	struct xgq_cmd_query_cu *c = (struct xgq_cmd_query_cu *)cmd;
 	struct xgq_cmd_resp_query_cu *r = (struct xgq_cmd_resp_query_cu *)resp;
 
-	if(c->domain == (SCU_DOMAIN>>16)) {
+	if(c->cu_domain == (SCU_DOMAIN>>16)) {
 		if (zert->zce_num_scus <= c->cu_idx) {
 			zert_err(zert, "SCU index (%d) out of range", c->cu_idx);
 			init_resp(resp, cmd->cid, -EINVAL);
@@ -927,7 +927,7 @@ static void zert_cmd_query_cu(struct zocl_ctrl_ert *zert, struct xgq_cmd_sq_hdr 
 		r->offset = zert->zce_cu_xgqs[r->xgq_id].zcecx_ring - zert->zce_cq_start;
 		break;
 	case XGQ_CMD_QUERY_CU_STATUS:
-		if(c->domain == (SCU_DOMAIN>>16)) {
+		if(c->cu_domain == (SCU_DOMAIN>>16)) {
 			r->status = zocl_scu_get_status(cu->zcec_pdev);
 		} else {
 			r->status = zocl_cu_get_status(cu->zcec_pdev);

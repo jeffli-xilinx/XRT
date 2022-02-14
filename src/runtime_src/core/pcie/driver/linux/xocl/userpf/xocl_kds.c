@@ -1638,6 +1638,7 @@ xocl_kds_xgq_cfg_cu(struct xocl_dev *xdev, struct xrt_cu_info *cu_info, int num_
 		cfg_cu->hdr.state = 1;
 
 		cfg_cu->cu_idx = i;
+		cfg_cu->cu_domain = 0;
 		cfg_cu->ip_ctrl = cu_info[i].protocol;
 		cfg_cu->map_size = cu_info[i].size;
 		cfg_cu->laddr = cu_info[i].addr;
@@ -1718,6 +1719,7 @@ xocl_kds_xgq_cfg_scu(struct xocl_dev *xdev, struct xrt_cu_info *cu_info, int num
 		cfg_cu->hdr.state = 1;
 
 		cfg_cu->cu_idx = i;
+		cfg_cu->cu_domain = (SCU_DOMAIN >> 16);
 		cfg_cu->ip_ctrl = cu_info[i].protocol;
 		cfg_cu->map_size = cu_info[i].size;
 		cfg_cu->laddr = cu_info[i].addr;
@@ -1754,7 +1756,7 @@ xocl_kds_xgq_cfg_scu(struct xocl_dev *xdev, struct xrt_cu_info *cu_info, int num
 	return ret;
 }
 
-static int xocl_kds_xgq_query_cu(struct xocl_dev *xdev, u32 cu_idx,
+static int xocl_kds_xgq_query_cu(struct xocl_dev *xdev, u32 cu_idx, u32 cu_domain,
 				 struct xgq_cmd_resp_query_cu *resp)
 {
 	struct xgq_cmd_query_cu *query_cu = NULL;
@@ -1774,6 +1776,7 @@ static int xocl_kds_xgq_query_cu(struct xocl_dev *xdev, u32 cu_idx,
 	query_cu->hdr.count = sizeof(*query_cu) - sizeof(query_cu->hdr);
 	query_cu->hdr.state = 1;
 	query_cu->cu_idx = cu_idx;
+	query_cu->cu_domain = cu_domain;
 	query_cu->type = XGQ_CMD_QUERY_CU_CONFIG;
 
 	xcmd->cb.notify_host = xocl_kds_xgq_notify;
@@ -1856,7 +1859,7 @@ static int xocl_kds_update_xgq(struct xocl_dev *xdev, struct drm_xocl_kds cfg)
 		struct xgq_cmd_resp_query_cu resp;
 		void *xgq;
 
-		ret = xocl_kds_xgq_query_cu(xdev, i, &resp);
+		ret = xocl_kds_xgq_query_cu(xdev, i, 0, &resp);
 		if (ret)
 			goto create_regular_cu;
 
@@ -1876,7 +1879,7 @@ static int xocl_kds_update_xgq(struct xocl_dev *xdev, struct drm_xocl_kds cfg)
 		struct xgq_cmd_resp_query_cu resp;
 		void *xgq;
 
-		ret = xocl_kds_xgq_query_cu(xdev, i, &resp);
+		ret = xocl_kds_xgq_query_cu(xdev, i, (SCU_DOMAIN>>16), &resp);
 		if (ret)
 			goto create_regular_cu;
 

@@ -225,7 +225,7 @@ struct xgq_cmd_config_cu {
 
 	/* word 2 */
 	uint32_t cu_idx:12;
-	uint32_t domain:4;
+	uint32_t cu_domain:4;
 	uint32_t ip_ctrl:8;
 	uint32_t rsvd2:8;
 
@@ -254,7 +254,7 @@ struct xgq_cmd_query_cu {
 
 	/* word 2 */
 	uint32_t cu_idx:12;
-	uint32_t domain:4;
+	uint32_t cu_domain:4;
 	uint32_t type:4;
 	uint32_t rsvd2:8;
 };
