@@ -451,6 +451,7 @@ static void zert_assign_cu_xgqs(struct zocl_ctrl_ert *zert)
 		}
 	}
 
+	xgqpdev = NULL;
 	cu = &zert->zce_scus[0];
 	for (i = 0; i < zert->zce_num_scus; i++, cu++) {
 		if (cu->zcec_pdev) {
@@ -503,13 +504,13 @@ static int zert_create_cu_xgqs(struct zocl_ctrl_ert *zert)
 
 	/* Find out the appropriate number of XGQs to enable. */
 	nxgqs = zert->zce_cu_xgq_ring_size / xgq_ring_size;
-	if (nxgqs > zert->zce_num_cus)
-		nxgqs = zert->zce_num_cus;
+	if (nxgqs > (zert->zce_num_cus + zert->zce_num_scus))
+		nxgqs = zert->zce_num_cus + zert->zce_num_scus;
 	if (nxgqs > zert->zce_num_cu_xgqs)
 		nxgqs = zert->zce_num_cu_xgqs;
 
-	zert_info(zert, "Creating %ld XGQs (slot size 0x%lx) for %ld CUs",
-		  nxgqs, slot_sz, zert->zce_num_cus);
+	zert_info(zert, "Creating %ld XGQs (slot size 0x%lx) for %ld CUs and %ld SCUs",
+		  nxgqs, slot_sz, zert->zce_num_cus, zert->zce_num_scus);
 
 	/* Enable first nxgqs number of CU XGQs. */
 	for (i = 0; i < nxgqs; i++) {
