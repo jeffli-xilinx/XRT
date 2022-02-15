@@ -38,7 +38,7 @@ namespace xrt {
     sk_meta_bo = sk_meta_bohdl;
     strcpy(xclbin_uuid,uuid);
 
-    syslog(LOG_INFO, "Stargin skd instance with kernel name %s, CU index %d, uuid %s\n",kname, cu_index, uuid);
+    syslog(LOG_INFO, "Starting skd instance with kernel name %s, CU index %d, uuid %s\n",kname, cu_index, uuid);
     // Set sk_path according to sk_name
     snprintf(sk_path, XRT_MAX_PATH_LENGTH, "%s%s%d", SOFT_KERNEL_FILE_PATH,
 	     sk_name,cu_idx);
@@ -75,7 +75,7 @@ namespace xrt {
 
     // Extract arguments from sk_meta_bohdl
     if (xclGetBOProperties(devHdl, sk_meta_bo, &prop)) {
-      syslog(LOG_ERR, "Cannot get BO info.\n");
+      syslog(LOG_ERR, "Cannot get metadata BO info.\n");
       xclFreeBO(devHdl, sk_meta_bo);
       return -1;
     }
@@ -258,7 +258,7 @@ namespace xrt {
     
     xclBOProperties prop;
     if (xclGetBOProperties(handle, bohdl, &prop)) {
-      syslog(LOG_ERR, "Cannot get BO info.\n");
+      syslog(LOG_ERR, "Cannot get SK .so BO info.\n");
       xclFreeBO(handle, bohdl);
       return -1;
     }
