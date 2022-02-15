@@ -770,7 +770,7 @@ xclSKGetCmd(xclSKCmd *cmd)
     cmd->cu_nums = scmd.cu_nums;
     cmd->bohdl = scmd.bohdl;
     cmd->meta_bohdl = scmd.meta_bohdl;
-    snprintf(cmd->sk_uuid, 16, "%s", scmd.uuid);
+    snprintf(cmd->uuid, 16, "%s", scmd.uuid);
     snprintf(cmd->krnl_name, ZOCL_MAX_NAME_LENGTH, "%s", scmd.name);
   }
 
