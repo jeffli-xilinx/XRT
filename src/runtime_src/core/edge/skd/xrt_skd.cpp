@@ -37,7 +37,8 @@ namespace xrt {
     sk_bo = sk_bohdl;
     sk_meta_bo = sk_meta_bohdl;
     strcpy(xclbin_uuid,uuid);
-    
+
+    syslog(LOG_INFO, "Stargin skd instance with kernel name %s, CU index %d, uuid %s\n",kname, cu_index, uuid);
     // Set sk_path according to sk_name
     snprintf(sk_path, XRT_MAX_PATH_LENGTH, "%s%s%d", SOFT_KERNEL_FILE_PATH,
 	     sk_name,cu_idx);

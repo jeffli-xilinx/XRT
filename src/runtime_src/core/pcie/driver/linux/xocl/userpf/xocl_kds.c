@@ -1883,7 +1883,6 @@ static int xocl_kds_update_xgq(struct xocl_dev *xdev, struct drm_xocl_kds cfg)
 		if (ret)
 			goto create_regular_cu;
 
-		printk("SCU xgq_id = %d, offset = %x\n",resp.xgq_id, resp.offset);
 		xgq = xocl_ert_ctrl_setup_xgq(xdev, resp.xgq_id, resp.offset);
 		if (IS_ERR(xgq)) {
 			userpf_err(xdev, "Setup XGQ failed\n");
