@@ -11,6 +11,7 @@
  */
 
 #include "zocl_drv.h"
+#include "zocl_sk.h"
 #include "xrt_cu.h"
 
 struct zocl_scu {
