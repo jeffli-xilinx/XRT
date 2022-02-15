@@ -187,13 +187,13 @@ zocl_load_pskernel(struct drm_zocl_dev *zdev, struct axlf *axlf)
 	kfree(sk->sk_img);
 	sk->sk_nimg = 0;
 	sk->sk_img = NULL;
-	mutex_unlock(&sk->sk_lock);
 
 	count = xrt_xclbin_get_section_num(axlf, SOFT_KERNEL);
-	if (count == 0)
+	if (count == 0) {
+		mutex_unlock(&sk->sk_lock);
 		return 0;
+	}
 
-	mutex_lock(&sk->sk_lock);
 
 	sk->sk_nimg = count;
 	sk->sk_img = kzalloc(sizeof(struct scu_image) * count, GFP_KERNEL);
