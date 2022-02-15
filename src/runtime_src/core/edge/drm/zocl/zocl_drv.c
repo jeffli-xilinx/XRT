@@ -1242,6 +1242,7 @@ static struct platform_driver *drivers[] = {
 	&zocl_watchdog_driver,
 	&zocl_ospi_versal_driver,
 	&cu_driver,
+	&scu_driver,
 	&zocl_drm_private_driver,
 	&zocl_csr_intc_driver,
 	&zocl_xgq_intc_driver,
