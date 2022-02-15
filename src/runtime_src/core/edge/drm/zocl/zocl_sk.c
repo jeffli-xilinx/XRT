@@ -65,8 +65,11 @@ zocl_sk_getcmd_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 		}
 
 		for (i = 0; i < sk->sk_nimg; i++) {
-			if(strcmp(sk->sk_img[i].scu_name,(char *)cmd->sk_name)!=0)
+			if(strcmp(sk->sk_img[i].scu_name,(char *)cmd->sk_name)!=0) {
+				DRM_INFO("SK image name %s not matching sk_name %s\n",
+					 sk->sk_img[i].scu_name,(char *)cmd->sk_name);
 				continue;
+			}
 
 			if (sk->sk_img[i].si_bohdl >= 0) {
 				bohdl = sk->sk_img[i].si_bohdl;
