@@ -179,7 +179,7 @@ static void cu_conf2info(struct xgq_cmd_config_cu *conf, struct xrt_cu_info *inf
 	info->cu_idx = conf->cu_idx;
 	strcpy(info->kname, strsep(&kname_p, ":"));
 	strcpy(info->iname, strsep(&kname_p, ":"));
-	strcpy(info->uuid, conf->uuid);
+	memcpy(info->uuid, conf->uuid, sizeof(info->uuid));
 }
 
 static int zert_create_cu(struct zocl_ctrl_ert *zert, struct xgq_cmd_config_cu *conf)
