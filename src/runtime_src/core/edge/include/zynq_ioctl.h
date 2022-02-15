@@ -432,6 +432,8 @@ struct drm_zocl_axlf {
  * @paddr        : soft kernel image's physical address (little endian)
  * @name         : symbol name of soft kernel
  * @bohdl        : BO to hold soft kernel image
+ * @meta_bohdl   : BO to hold metadata
+ * @uuid         : UUID for the xclbin
  */
 struct drm_zocl_sk_getcmd {
 	uint32_t	opcode;

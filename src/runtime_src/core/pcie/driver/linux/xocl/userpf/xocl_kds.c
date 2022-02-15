@@ -1701,8 +1701,16 @@ xocl_kds_xgq_cfg_scu(struct xocl_dev *xdev, struct xrt_cu_info *cu_info, int num
 	struct kds_sched *kds = &XDEV(xdev)->kds;
 	struct kds_client *client = NULL;
 	struct kds_command *xcmd = NULL;
+	xuid_t *xclbin_id = NULL;
 	int ret = 0;
 	int i = 0, j = 0;
+
+	/* TODO: ICAP will pass UUID to KDS, instead of fetch it */
+	ret = XOCL_GET_XCLBIN_ID(xdev, xclbin_id);
+	if (ret) {
+		userpf_err(xdev, "Unable to get on device uuid %d", ret);
+		return -EINVAL;
+	}
 
 	for (i = 0; i < num_cus; i++) {
 		int max_off_idx = 0;
@@ -1710,8 +1718,10 @@ xocl_kds_xgq_cfg_scu(struct xocl_dev *xdev, struct xrt_cu_info *cu_info, int num
 
 		client = kds->anon_client;
 		xcmd = kds_alloc_command(client, sizeof(struct xgq_cmd_config_cu));
-		if (!xcmd)
+		if (!xcmd) {
+			XOCL_PUT_XCLBIN_ID(xdev);
 			return -ENOMEM;
+		}
 
 		cfg_cu = xcmd->info;
 		cfg_cu->hdr.opcode = XGQ_CMD_OP_CFG_CU;
@@ -1734,6 +1744,8 @@ xocl_kds_xgq_cfg_scu(struct xocl_dev *xdev, struct xrt_cu_info *cu_info, int num
 		scnprintf(cfg_cu->name, sizeof(cfg_cu->name), "%s:%s",
 			  cu_info[i].kname, cu_info[i].iname);
 
+		memcpy(cfg_cu->uuid, xclbin_id, sizeof(cfg_cu->uuid));
+
 		xcmd->cb.notify_host = xocl_kds_xgq_notify;
 		xcmd->cb.free = kds_free_command;
 		xcmd->priv = kds;
@@ -1753,6 +1765,7 @@ xocl_kds_xgq_cfg_scu(struct xocl_dev *xdev, struct xrt_cu_info *cu_info, int num
 		}
 	}
 
+	XOCL_PUT_XCLBIN_ID(xdev);
 	return ret;
 }
 

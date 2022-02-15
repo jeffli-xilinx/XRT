@@ -87,6 +87,44 @@ static const struct attribute_group scu_attrgroup = {
 	.attrs = scu_attrs,
 };
 
+static int configure_soft_kernel(u32 cuidx, char kname[64], char uuid[16])
+{
+	struct drm_zocl_dev *zdev = zocl_get_zdev();
+	struct soft_krnl *sk = zdev->soft_kernel;
+	struct soft_krnl_cmd *scmd;
+	struct config_sk_image *cp;
+
+	cp = kmalloc(sizeof(struct config_sk_image), GFP_KERNEL);
+	cp->start_cuidx = cuidx;
+	cp->num_cus = 1;
+	strncpy((char *)cp->sk_name,kname,PS_KERNEL_NAME_LENGTH);
+	strcpy(cp->sk_uuid,uuid);
+
+	mutex_lock(&sk->sk_lock);
+
+	/*
+	 * Fill up a soft kernel command and add to soft
+	 * kernel command list
+	 */
+	scmd = kmalloc(sizeof(struct soft_krnl_cmd), GFP_KERNEL);
+	if (!scmd) {
+		DRM_WARN("Config Soft CU failed: no memory.\n");
+		mutex_unlock(&sk->sk_lock);
+		return -ENOMEM;
+	}
+
+	scmd->skc_opcode = ERT_SK_CONFIG;
+	scmd->skc_packet = cp;
+
+	list_add_tail(&scmd->skc_list, &sk->sk_cmd_list);
+	mutex_unlock(&sk->sk_lock);
+
+	/* start CU by waking up PS kernel handler */
+	wake_up_interruptible(&sk->sk_wait_queue);
+
+	return 0;
+}
+
 static int scu_probe(struct platform_device *pdev)
 {
 	struct zocl_scu *zcu;
@@ -123,6 +161,10 @@ static int scu_probe(struct platform_device *pdev)
 	if (err)
 		zocl_err(&pdev->dev, "create SCU attrs failed: %d", err);
 
+	configure_soft_kernel(info->cu_idx,info->kname,info->uuid);
+	if (err)
+		zocl_err(&pdev->dev, "configuring SCU failed: %d", err);
+	
 	zocl_info(&pdev->dev, "SCU[%d] created", info->cu_idx);
 	return 0;
 err2:

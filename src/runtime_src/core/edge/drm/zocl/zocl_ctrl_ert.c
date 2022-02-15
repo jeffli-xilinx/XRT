@@ -178,44 +178,7 @@ static void cu_conf2info(struct xgq_cmd_config_cu *conf, struct xrt_cu_info *inf
 	info->inst_idx = conf->cu_idx;
 	strcpy(info->kname, strsep(&kname_p, ":"));
 	strcpy(info->iname, strsep(&kname_p, ":"));
-}
-
-static int zert_configure_soft_kernel(u32 cuidx, char kname[64], char uuid[16])
-{
-	struct drm_zocl_dev *zdev = zocl_get_zdev();
-	struct soft_krnl *sk = zdev->soft_kernel;
-	struct soft_krnl_cmd *scmd;
-	struct config_sk_image *cp;
-
-	cp = kmalloc(sizeof(struct config_sk_image), GFP_KERNEL);
-	cp->start_cuidx = cuidx;
-	cp->num_cus = 1;
-	strncpy((char *)cp->sk_name,kname,PS_KERNEL_NAME_LENGTH);
-	strcpy(cp->sk_uuid,uuid);
-
-	mutex_lock(&sk->sk_lock);
-
-	/*
-	 * Fill up a soft kernel command and add to soft
-	 * kernel command list
-	 */
-	scmd = kmalloc(sizeof(struct soft_krnl_cmd), GFP_KERNEL);
-	if (!scmd) {
-		DRM_WARN("Config Soft CU failed: no memory.\n");
-		mutex_unlock(&sk->sk_lock);
-		return -ENOMEM;
-	}
-
-	scmd->skc_opcode = ERT_SK_CONFIG;
-	scmd->skc_packet = cp;
-
-	list_add_tail(&scmd->skc_list, &sk->sk_cmd_list);
-	mutex_unlock(&sk->sk_lock);
-
-	/* start CU by waking up PS kernel handler */
-	wake_up_interruptible(&sk->sk_wait_queue);
-
-	return 0;
+	strcpy(info->uuid, conf->uuid);
 }
 
 static int zert_create_cu(struct zocl_ctrl_ert *zert, struct xgq_cmd_config_cu *conf)
@@ -259,11 +222,6 @@ static int zert_create_scu(struct zocl_ctrl_ert *zert, struct xgq_cmd_config_cu 
 	ret = subdev_create_scu(ZERT2DEV(zert), &info, &zert->zce_scus[cuidx].zcec_pdev);
 	if (ret) {
 		zert_err(zert, "Failed to create SCU.%d device", cuidx);
-		return ret;
-	}
-	ret = zert_configure_soft_kernel(cuidx,conf->name,conf->uuid);
-	if (ret) {
-		zert_err(zert, "Failed to configure SCU.%d ", cuidx);
 		return ret;
 	}
 
