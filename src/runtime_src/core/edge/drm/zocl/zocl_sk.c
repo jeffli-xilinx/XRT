@@ -70,6 +70,8 @@ zocl_sk_getcmd_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 					 sk->sk_img[i].scu_name,(char *)cmd->sk_name);
 				continue;
 			}
+			DRM_INFO("Found SK image name %s matching sk_name %s\n",
+				 sk->sk_img[i].scu_name,(char *)cmd->sk_name);
 
 			if (sk->sk_img[i].si_bohdl >= 0) {
 				bohdl = sk->sk_img[i].si_bohdl;
@@ -83,6 +85,8 @@ zocl_sk_getcmd_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 				DRM_WARN("%s Failed create BO handle: %d\n",
 				    __func__, ret);
 				bohdl = 0xffffffff;
+			} else {
+				DRM_INFO("sk_img[i] BO handle %d created\n",i,bohdl);
 			}
 
 			break;
