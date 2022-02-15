@@ -1554,8 +1554,8 @@ xocl_kds_xgq_cfg_start(struct xocl_dev *xdev, struct drm_xocl_kds cfg, int num_c
 		return -EINVAL;
 	}
 
-	userpf_info(xdev, "Config start completed, num_cus(%d)\n",
-		    cfg_start->num_cus);
+	userpf_info(xdev, "Config start completed, num_cus(%d), num_scus(%d)\n",
+		    cfg_start->num_cus, cfg_start->num_cus);
 	return 0;
 }
 
@@ -1797,7 +1797,7 @@ static int xocl_kds_xgq_query_cu(struct xocl_dev *xdev, u32 cu_idx, u32 cu_domai
 		return -EINVAL;
 	}
 
-	userpf_info(xdev, "Query CU(%d) completed\n", query_cu->cu_idx);
+	userpf_info(xdev, "Query Doamin(%d) CU(%d) completed\n", query_cu->cu_domain, query_cu->cu_idx);
 	userpf_info(xdev, "xgq_id %d\n", resp->xgq_id);
 	userpf_info(xdev, "size %d\n", resp->size);
 	userpf_info(xdev, "offset 0x%x\n", resp->offset);
@@ -1890,10 +1890,10 @@ static int xocl_kds_update_xgq(struct xocl_dev *xdev, struct drm_xocl_kds cfg)
 			ret = PTR_ERR(xgq);
 			goto create_regular_cu;
 		}
-		cu_info[i].model = XCU_XGQ;
-		cu_info[i].xgq = xgq;
+		scu_info[i].model = XCU_XGQ;
+		scu_info[i].xgq = xgq;
 	}
-	xocl_kds_create_scus(xdev, cu_info, num_scus);
+	xocl_kds_create_scus(xdev, scu_info, num_scus);
 
 	XDEV(xdev)->kds.xgq_enable = (cfg.ert)? true : false;
 	goto out;
@@ -1907,6 +1907,7 @@ out:
 	userpf_info(xdev, "scheduler config ert(%d)\n",
 		    XDEV(xdev)->kds.xgq_enable);
 	kfree(cu_info);
+	kfree(scu_info);
 	return ret;
 }
 

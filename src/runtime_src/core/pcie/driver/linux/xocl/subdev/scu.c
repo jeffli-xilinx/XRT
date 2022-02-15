@@ -225,6 +225,8 @@ static int scu_probe(struct platform_device *pdev)
 {
 	xdev_handle_t xdev = xocl_get_xdev(pdev);
 	struct xocl_cu *xcu;
+	struct xrt_cu_info *info = NULL;
+	struct xrt_cu_arg *args = NULL;
 	int err = 0;
 
 	/* Not using xocl_drvinst_alloc here. Because it would quickly run out
@@ -238,12 +240,15 @@ static int scu_probe(struct platform_device *pdev)
 	xcu->pdev = pdev;
 	xcu->base.dev = XDEV2DEV(xdev);
 
+	info = XOCL_GET_SUBDEV_PRIV(&pdev->dev);
+	BUG_ON(!info);
+	memcpy(&xcu->base.info, info, sizeof(struct xrt_cu_info));
+
 	xcu->base.info.model = XCU_XGQ;
 
 	err = xocl_kds_add_scu(xdev, &xcu->base);
 	if (err) {
-		err = 0; //Ignore this error now
-		//XSCU_ERR(xcu, "Not able to add CU %p to KDS", xcu);
+		XSCU_ERR(xcu, "Not able to add CU %p to KDS", xcu);
 		goto err;
 	}
 	err = xrt_cu_xgq_init(&xcu->base);
