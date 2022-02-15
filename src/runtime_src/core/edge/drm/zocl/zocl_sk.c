@@ -62,6 +62,8 @@ zocl_sk_getcmd_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 			DRM_WARN("%s Failed create metadata BO handle: %d\n",
 				 __func__, ret);
 			meta_bohdl = 0xffffffff;
+		} else {
+			DRM_INFO("sk_meta_data BO handle %d created\n",meta_bohdl);
 		}
 
 		for (i = 0; i < sk->sk_nimg; i++) {

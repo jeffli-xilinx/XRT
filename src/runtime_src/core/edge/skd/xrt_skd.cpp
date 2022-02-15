@@ -38,7 +38,7 @@ namespace xrt {
     sk_meta_bo = sk_meta_bohdl;
     strcpy(xclbin_uuid,uuid);
 
-    syslog(LOG_INFO, "Starting skd instance with kernel name %s, CU index %d, uuid %s\n",kname, cu_index, uuid);
+    syslog(LOG_INFO, "Starting skd instance with kernel name %s, CU index %d, SK BO %0d, Meta BO %0d, uuid %s\n",sk_name, cu_idx, sk_bo, sk_meta_bo, xclbin_uuid);
     // Set sk_path according to sk_name
     snprintf(sk_path, XRT_MAX_PATH_LENGTH, "%s%s%d", SOFT_KERNEL_FILE_PATH,
 	     sk_name,cu_idx);

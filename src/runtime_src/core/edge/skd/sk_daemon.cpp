@@ -107,7 +107,7 @@ void configSoftKernel(xclDeviceHandle handle, xclSKCmd *cmd)
           syslog(LOG_ERR, "Unable to set process name to %s due to %s\n", proc_name, strerror(errno));
       }
 
-      /* Start the soft kenel loop for each CU. */
+      /* Start the soft kernel loop for each CU. */
       ret = skd_inst->init();
       if(ret) {
 	syslog(LOG_ERR, "Soft kernel initialization failed!\n");
