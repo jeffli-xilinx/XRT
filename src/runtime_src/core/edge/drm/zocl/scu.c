@@ -162,7 +162,7 @@ static int scu_probe(struct platform_device *pdev)
 	if (err)
 		zocl_err(&pdev->dev, "create SCU attrs failed: %d", err);
 
-	configure_soft_kernel(info->cu_idx,info->kname,info->uuid);
+	err = configure_soft_kernel(info->cu_idx,info->kname,info->uuid);
 	if (err)
 		zocl_err(&pdev->dev, "configuring SCU failed: %d", err);
 	
