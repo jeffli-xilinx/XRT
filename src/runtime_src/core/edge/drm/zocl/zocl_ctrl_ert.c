@@ -874,7 +874,7 @@ static void zert_cmd_cfg_cu(struct zocl_ctrl_ert *zert, struct xgq_cmd_sq_hdr *c
 	int rc;
 	struct xgq_cmd_config_cu *c = (struct xgq_cmd_config_cu *)cmd;
 
-	if(cmd->cu_domain==(SCU_DOMAIN>>16)) {
+	if(c->cu_domain==(SCU_DOMAIN>>16)) {
 		rc = zert_create_scu(zert, c);
 		init_resp(resp, cmd->cid, rc);
 	} else {
