@@ -115,8 +115,8 @@ ssize_t show_kds_scustat_raw(struct kds_sched *kds, char *buf)
 				continue;
 
 			sz += scnprintf(buf+sz, PAGE_SIZE - sz, cu_fmt, j,
-					(i | SCU_DOMAIN), scu_mgmt->name[i],
-					scu_mgmt->status[i],
+					(i | SCU_DOMAIN), xcu->info.iname,
+					xcu->status,
 					cu_stat_read(scu_mgmt,usage[i]));
 		}
 	}

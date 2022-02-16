@@ -99,7 +99,7 @@ zocl_sk_getcmd_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 		kdata->cu_nums = cmd->num_cus;
 		kdata->bohdl = bohdl;
 		kdata->meta_bohdl = meta_bohdl;
-		strcpy(kdata->uuid,cmd->sk_uuid);
+		memcpy(kdata->uuid,cmd->sk_uuid,sizeof(kdata->uuid));
 
 		snprintf(kdata->name, ZOCL_MAX_NAME_LENGTH, "%s",
 		    (char *)cmd->sk_name);
