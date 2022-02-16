@@ -31,8 +31,9 @@ namespace xrt {
    * @param soft kernel CU index
    *
    */
-  skd::skd(uint32_t sk_meta_bohdl, uint32_t sk_bohdl, char *kname, uint32_t cu_index, char *uuid) {
+  skd::skd(xclDeviceHandle handle, uint32_t sk_meta_bohdl, uint32_t sk_bohdl, char *kname, uint32_t cu_index, char *uuid) {
     strcpy(sk_name,kname);
+    devHdl = handle;
     cu_idx = cu_index;
     sk_bo = sk_bohdl;
     sk_meta_bo = sk_meta_bohdl;
@@ -50,12 +51,6 @@ namespace xrt {
     void *buf;
     xclBOProperties prop;
     int ret;
-
-    devHdl = initXRTHandle(0);
-    if (!devHdl) {
-      syslog(LOG_ERR, "Cannot open XRT device.\n");
-      return -1;
-    }
 
     // Create soft kernel file from sk_bo
     if(createSoftKernelFile(devHdl, sk_bo) != 0)
@@ -235,7 +230,6 @@ namespace xrt {
     xclClose(devHdl);
   }
 
-  xclDeviceHandle skd::initXRTHandle(unsigned deviceIndex) {return xclOpen(deviceIndex, NULL, XCL_QUIET);};
   int skd::createSoftKernel(unsigned int *boh) {
     int ret;
     ret = xclSKCreate(devHdl, *boh, cu_idx);

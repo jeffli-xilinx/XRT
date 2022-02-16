@@ -69,7 +69,7 @@ class skd
    * @param soft kernel CU index
    *
    */
-  skd(uint32_t sk_meta_bohdl, uint32_t sk_bohdl, char *kname, uint32_t cu_index, char *uuid);
+  skd(xclDeviceHandle handle, uint32_t sk_meta_bohdl, uint32_t sk_bohdl, char *kname, uint32_t cu_index, char *uuid);
   ~skd();
   
   XCL_DRIVER_DLLESPEC
@@ -104,7 +104,6 @@ class skd
     bool pass_xrtHandles = false;
     int num_args;
     
-    xclDeviceHandle initXRTHandle(unsigned deviceIndex);
     int waitNextCmd();
     int createSoftKernelFile(xclDeviceHandle handle, int bohdl);
     int deleteSoftKernelFile();

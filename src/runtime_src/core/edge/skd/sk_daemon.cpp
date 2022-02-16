@@ -78,7 +78,6 @@ void configSoftKernel(xclDeviceHandle handle, xclSKCmd *cmd)
     if (pid == 0) {
       char path[XRT_MAX_PATH_LENGTH];
       char proc_name[PNAME_LEN] = {};
-      xrt::skd* skd_inst = new xrt::skd(cmd->meta_bohdl,cmd->bohdl,cmd->krnl_name,i,cmd->uuid);
       int ret;
       
       /* Install Signal Handler for the Child Processes/Soft-Kernels */
@@ -108,6 +107,7 @@ void configSoftKernel(xclDeviceHandle handle, xclSKCmd *cmd)
       }
 
       /* Start the soft kernel loop for each CU. */
+      xrt::skd* skd_inst = new xrt::skd(handle,cmd->meta_bohdl,cmd->bohdl,cmd->krnl_name,i,cmd->uuid);
       ret = skd_inst->init();
       if(ret) {
 	syslog(LOG_ERR, "Soft kernel initialization failed!\n");

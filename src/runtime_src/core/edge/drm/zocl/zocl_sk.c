@@ -63,6 +63,7 @@ zocl_sk_getcmd_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 				 __func__, ret);
 			meta_bohdl = 0xffffffff;
 		} else {
+			sk->sk_meta_bohdl = meta_bohdl;
 			DRM_INFO("sk_meta_data BO handle 0x%x created\n",meta_bohdl);
 		}
 
@@ -88,6 +89,7 @@ zocl_sk_getcmd_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 				    __func__, ret);
 				bohdl = 0xffffffff;
 			} else {
+				sk->sk_img[i].si_bohdl = bohdl;
 				DRM_INFO("sk_img[%d] BO handle %d created\n",i,bohdl);
 			}
 
