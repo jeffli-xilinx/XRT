@@ -218,7 +218,7 @@ zocl_load_pskernel(struct drm_zocl_dev *zdev, struct axlf *axlf)
 	sk->sk_meta_bo->flags = ZOCL_BO_FLAGS_CMA;
 	sk->sk_meta_bohdl = -1;
 	DRM_INFO("Caching EMBEDDED_METADATA\n");
-	memcpy(sk->sk_meta_bo->cma_base.vaddr, xclbin + header->m_sectionOffset,
+	memcpy(sk->sk_meta_bo->cma_base.vaddr, axlf + header->m_sectionOffset,
 	       header->m_sectionSize);
 
 	header = xrt_xclbin_get_section_hdr_next(axlf, SOFT_KERNEL, header);
