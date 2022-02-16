@@ -102,6 +102,7 @@ zocl_sk_getcmd_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 		kdata->bohdl = bohdl;
 		kdata->meta_bohdl = meta_bohdl;
 		memcpy(kdata->uuid,cmd->sk_uuid,sizeof(kdata->uuid));
+		DRM_INFO("sk_meta_data BO handle 0x%x after uuid memcpy\n",kdata->meta_bohdl);
 
 		snprintf(kdata->name, ZOCL_MAX_NAME_LENGTH, "%s",
 		    (char *)cmd->sk_name);
