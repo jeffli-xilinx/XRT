@@ -31,7 +31,7 @@ namespace xrt {
    * @param soft kernel CU index
    *
    */
-  skd::skd(xclDeviceHandle handle, uint32_t sk_meta_bohdl, uint32_t sk_bohdl, char *kname, uint32_t cu_index, char *uuid) {
+  skd::skd(xclDeviceHandle handle, int sk_meta_bohdl, int sk_bohdl, char *kname, uint32_t cu_index, char *uuid) {
     strcpy(sk_name,kname);
     devHdl = handle;
     cu_idx = cu_index;
@@ -39,7 +39,6 @@ namespace xrt {
     sk_meta_bo = sk_meta_bohdl;
     memcpy(xclbin_uuid,uuid,sizeof(xclbin_uuid));
 
-    syslog(LOG_INFO, "Starting skd instance with kernel name %s, CU index %d, SK BO %0d, Meta BO %0d, uuid %s\n",sk_name, cu_idx, sk_bo, sk_meta_bo, xclbin_uuid);
     // Set sk_path according to sk_name
     snprintf(sk_path, XRT_MAX_PATH_LENGTH, "%s%s%d", SOFT_KERNEL_FILE_PATH,
 	     sk_name,cu_idx);
@@ -150,7 +149,7 @@ namespace xrt {
     int ret;
     void* ffi_arg_values[num_args];
     // Buffer Objects
-    unsigned int boHandles[num_args];
+    int boHandles[num_args];
     void* bos[num_args];
     uint64_t boSize[num_args];
     std::vector<int> bo_list;
@@ -245,7 +244,6 @@ namespace xrt {
    */
   int skd::createSoftKernelFile(xclDeviceHandle handle, int bohdl)
   {
-    unsigned int boHandle;
     FILE *fptr;
     void *buf;
     char path[XRT_MAX_PATH_LENGTH];

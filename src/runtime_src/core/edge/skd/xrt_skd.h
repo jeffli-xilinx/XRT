@@ -69,7 +69,7 @@ class skd
    * @param soft kernel CU index
    *
    */
-  skd(xclDeviceHandle handle, uint32_t sk_meta_bohdl, uint32_t sk_bohdl, char *kname, uint32_t cu_index, char *uuid);
+  skd(xclDeviceHandle handle, int sk_meta_bohdl, int sk_bohdl, char *kname, uint32_t cu_index, char *uuid);
   ~skd();
   
   XCL_DRIVER_DLLESPEC
@@ -90,14 +90,14 @@ class skd
     uint32_t cu_idx;
     char sk_name[PS_KERNEL_NAME_LENGTH];
     pscontext* xrtHandle;
-    uint32_t sk_bo;
-    uint32_t sk_meta_bo;
+    int sk_bo;
+    int sk_meta_bo;
     char xclbin_uuid[16];
     
     void* sk_handle;
     void* kernel;
     std::vector<xrt_core::xclbin::kernel_argument> args;
-    unsigned int cmd_boh;
+    int cmd_boh;
     uint32_t *args_from_host;
     ffi_type** ffi_args;
     ffi_cif cif;
