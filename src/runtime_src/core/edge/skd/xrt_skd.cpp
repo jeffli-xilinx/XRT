@@ -31,7 +31,7 @@ namespace xrt {
    * @param soft kernel CU index
    *
    */
-  skd::skd(int sk_meta_bohdl, int sk_bohdl, char *kname, uint32_t cu_index, char *uuid) {
+  skd::skd(uint32_t sk_meta_bohdl, uint32_t sk_bohdl, char *kname, uint32_t cu_index, char *uuid) {
     strcpy(sk_name,kname);
     cu_idx = cu_index;
     sk_bo = sk_bohdl;
