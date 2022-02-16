@@ -440,8 +440,8 @@ struct drm_zocl_sk_getcmd {
 	uint32_t	start_cuidx;
 	uint32_t	cu_nums;
 	char		name[ZOCL_MAX_NAME_LENGTH];
-	uint32_t	bohdl;
-	uint32_t	meta_bohdl;
+	int		bohdl;
+	int		meta_bohdl;
 	char		uuid[16];
 };
 
