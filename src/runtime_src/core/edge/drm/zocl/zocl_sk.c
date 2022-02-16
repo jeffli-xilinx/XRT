@@ -53,18 +53,18 @@ zocl_sk_getcmd_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 
 		if (sk->sk_meta_bohdl >= 0) {
 			meta_bohdl = sk->sk_meta_bohdl;
-		}
-
-		ret = drm_gem_handle_create(filp,
-			    &sk->sk_meta_bo->cma_base.base, &meta_bohdl);
-
-		if (ret) {
-			DRM_WARN("%s Failed create metadata BO handle: %d\n",
-				 __func__, ret);
-			meta_bohdl = 0xffffffff;
 		} else {
-			sk->sk_meta_bohdl = meta_bohdl;
-			DRM_INFO("sk_meta_data BO handle 0x%x created\n",meta_bohdl);
+			ret = drm_gem_handle_create(filp,
+						    &sk->sk_meta_bo->cma_base.base, &meta_bohdl);
+
+			if (ret) {
+				DRM_WARN("%s Failed create metadata BO handle: %d\n",
+					 __func__, ret);
+				meta_bohdl = 0xffffffff;
+			} else {
+				sk->sk_meta_bohdl = meta_bohdl;
+				DRM_INFO("sk_meta_data BO handle 0x%x created\n",meta_bohdl);
+			}
 		}
 
 		for (i = 0; i < sk->sk_nimg; i++) {
