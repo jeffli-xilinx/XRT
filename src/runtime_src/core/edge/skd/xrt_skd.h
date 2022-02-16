@@ -97,7 +97,7 @@ class skd
     void* sk_handle;
     void* kernel;
     std::vector<xrt_core::xclbin::kernel_argument> args;
-    int cmd_boh;
+    unsigned int cmd_boh;
     uint32_t *args_from_host;
     ffi_type** ffi_args;
     ffi_cif cif;
