@@ -37,12 +37,13 @@ namespace xrt {
     cu_idx = cu_index;
     sk_bo = sk_bohdl;
     sk_meta_bo = sk_meta_bohdl;
-    strcpy(xclbin_uuid,uuid);
+    memcpy(xclbin_uuid,uuid,sizeof(xclbin_uuid));
 
     syslog(LOG_INFO, "Starting skd instance with kernel name %s, CU index %d, SK BO %0d, Meta BO %0d, uuid %s\n",sk_name, cu_idx, sk_bo, sk_meta_bo, xclbin_uuid);
     // Set sk_path according to sk_name
     snprintf(sk_path, XRT_MAX_PATH_LENGTH, "%s%s%d", SOFT_KERNEL_FILE_PATH,
 	     sk_name,cu_idx);
+    syslog(LOG_INFO, "Starting skd instance with kernel name %s, CU index %d, SK BO %0d, Meta BO %0d, uuid %x, path %s\n",sk_name, cu_idx, sk_bo, sk_meta_bo, xclbin_uuid, sk_path);
   }
 
   XCL_DRIVER_DLLESPEC
@@ -297,6 +298,7 @@ namespace xrt {
       xclFreeBO(handle, bohdl);
       return -1;
     }
+    syslog(LOG_INFO,"File created at %s\n", sk_path);
     
     fclose(fptr);
     munmap(buf, prop.size);
