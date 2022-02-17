@@ -457,8 +457,6 @@ int xrt_is_fa(struct xrt_cu *xcu, u32 *size);
 int xrt_cu_get_protocol(struct xrt_cu *xcu);
 u32 xrt_cu_get_status(struct xrt_cu *xcu);
 int xrt_cu_regmap_size(struct xrt_cu *xcu);
-void xrt_cu_create_sk(struct xrt_cu *xcu, u32 pid, u32 parent_pid);
-int xrt_cu_wait_cmd_sk(struct xrt_cu *xcu);
 
 int  xrt_cu_init(struct xrt_cu *xcu);
 void xrt_cu_fini(struct xrt_cu *xcu);

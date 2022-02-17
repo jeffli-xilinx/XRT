@@ -222,13 +222,46 @@ u32 zocl_scu_get_status(struct platform_device *pdev)
 	BUG_ON(!zcu);
 	return xrt_cu_get_status(&zcu->base);
 }
-void zocl_scu_create_sk(struct platform_device *pdev, u32 pid, u32 parent_pid)
+int zocl_scu_create_sk(struct platform_device *pdev, u32 pid, u32 parent_pid, struct drm_file *filp, int *boHandle)
 {
 	struct zocl_scu *zcu = platform_get_drvdata(pdev);
-	xrt_cu_create_sk(&zcu->base,pid,parent_pid);
+	struct xrt_cu *xcu = &zcu->base;
+	struct xrt_cu_scu *cu_scu = xcu->core;
+	int ret;
+
+	if(!cu_scu) {
+		return -EINVAL;
+	}
+	cu_scu->sc_pid = pid;
+	cu_scu->sc_parent_pid = parent_pid;
+	sema_init(&cu_scu->sc_sem, 0);
+	ret = drm_gem_handle_create(filp,
+				    &cu_scu->sc_bo->cma_base.base, boHandle);
+	return(ret);
 }
 int zocl_scu_wait_cmd_sk(struct platform_device *pdev)
 {
 	struct zocl_scu *zcu = platform_get_drvdata(pdev);
-	return xrt_cu_wait_cmd_sk(&zcu->base);
+	struct xrt_cu *xcu = &zcu->base;
+	struct xrt_cu_scu *cu_scu = xcu->core;
+	int ret = 0;
+	u32 *vaddr = cu_scu->vaddr;
+
+	/* If the CU is running, mark it as done */
+	if (*vaddr & 1)
+		/* Clear Bit 0 and set Bit 1 */
+		*vaddr = 2 | (*vaddr & ~3);
+
+	if (down_killable(&cu_scu->sc_sem))
+		ret = -EINTR;
+
+	if (ret) {
+		/* We are interrupted */
+		return ret;
+	}
+
+	/* Clear Bit 1 and set Bit 0 */
+	*vaddr = 1 | (*vaddr & ~3);
+
+	return 0;
 }

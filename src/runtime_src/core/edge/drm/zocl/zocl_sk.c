@@ -102,8 +102,7 @@ zocl_sk_getcmd_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 		kdata->bohdl = bohdl;
 		kdata->meta_bohdl = meta_bohdl;
 		memcpy(kdata->uuid,cmd->sk_uuid,sizeof(kdata->uuid));
-		DRM_INFO("sk_meta_data BO handle 0x%x after uuid memcpy\n",kdata->meta_bohdl);
-
+		
 		snprintf(kdata->name, ZOCL_MAX_NAME_LENGTH, "%s",
 		    (char *)cmd->sk_name);
 	} else
@@ -120,26 +119,39 @@ zocl_sk_create_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 {
 	struct drm_zocl_sk_create *args = data;
 	uint32_t cu_idx = args->cu_idx;
-	struct platform_device *zert = zocl_find_pdev("zocl_ctrl_ert");
+	struct platform_device *zert = zocl_find_pdev("ert_hw");
 	struct platform_device *scu_pdev;
 	struct zocl_cu *scu;
-
+	int boHandle;
+	int ret;
+	
 	if (cu_idx >= MAX_SOFT_KERNEL) {
 		DRM_ERROR("Fail to create soft kernel: CU index %d > %d.\n",
 			  cu_idx,MAX_SOFT_KERNEL);
 		return -EINVAL;
 	}
 
-	scu_pdev = zert_get_scu_pdev(zert,cu_idx);
+	if(!zert) {
+		DRM_ERROR("ERT not found!");
+		return -EINVAL;
+	}
+	scu_pdev = zert_get_scu_pdev(zert, cu_idx);
      	scu = platform_get_drvdata(scu_pdev);
 	if (!scu) {
 		DRM_ERROR("SCU %d does not exist.\n", cu_idx);
 		return -EINVAL;
 	}
 
-	zocl_scu_create_sk(scu_pdev,task_pid_nr(current),task_ppid_nr(current));
+	ret = zocl_scu_create_sk(scu_pdev,task_pid_nr(current),task_ppid_nr(current), filp, &boHandle);
 
-	return 0;
+	if (ret) {
+		DRM_WARN("%s Failed to create SK command BO handle: %d\n",
+			 __func__, ret);
+		boHandle = 0xffffffff;
+	}
+	
+	args->handle = boHandle;
+	return ret;
 }
 
 int
@@ -151,10 +163,14 @@ zocl_sk_report_ioctl(struct drm_device *dev, void *data,
 	uint32_t cu_idx = args->cu_idx;
 	enum drm_zocl_scu_state state = args->cu_state;
 	int ret = 0;
-	struct platform_device *zert = zocl_find_pdev("zocl_ctrl_ert");
+	struct platform_device *zert = zocl_find_pdev("ert_hw");
 	struct platform_device *scu_pdev;
 	
-	scu_pdev = zert_get_scu_pdev(zert,cu_idx);
+	if(!zert) {
+		DRM_ERROR("ERT not found!");
+		return -EINVAL;
+	}
+	scu_pdev = zert_get_scu_pdev(zert, cu_idx);
 	scu = platform_get_drvdata(scu_pdev);
 	if (!scu) {
 		DRM_ERROR("SCU %d does not exist.\n", cu_idx);

@@ -771,40 +771,6 @@ int xrt_cu_regmap_size(struct xrt_cu *xcu)
 	return max_off + xcu->info.args[max_off_idx].size;
 }
 
-void xrt_cu_create_sk(struct xrt_cu *xcu, u32 pid, u32 parent_pid)
-{
-	struct xrt_cu_scu *cu_scu = xcu->core;
-	
-	cu_scu->sc_pid = pid;
-	cu_scu->sc_parent_pid = parent_pid;
-	sema_init(&cu_scu->sc_sem, 0);
-}
-
-int xrt_cu_wait_cmd_sk(struct xrt_cu *xcu)
-{
-	struct xrt_cu_scu *cu_scu = xcu->core;
-	int ret = 0;
-	u32 *vaddr = cu_scu->vaddr;
-
-	/* If the CU is running, mark it as done */
-	if (*vaddr & 1)
-		/* Clear Bit 0 and set Bit 1 */
-		*vaddr = 2 | (*vaddr & ~3);
-
-	if (down_killable(&cu_scu->sc_sem))
-		ret = -EINTR;
-
-	if (ret) {
-		/* We are interrupted */
-		return ret;
-	}
-
-	/* Clear Bit 1 and set Bit 0 */
-	*vaddr = 1 | (*vaddr & ~3);
-
-	return 0;
-}
-
 int xrt_cu_init(struct xrt_cu *xcu)
 {
 	int err = 0;

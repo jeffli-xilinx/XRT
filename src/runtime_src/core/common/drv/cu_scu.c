@@ -158,7 +158,6 @@ int xrt_cu_scu_init(struct xrt_cu *xcu)
 	struct xrt_cu_scu *core;
 	size_t size;
 	int err = 0;
-	struct drm_zocl_create_bo args;
 	struct drm_zocl_dev *zdev;
 
 	core = kzalloc(sizeof(struct xrt_cu_scu), GFP_KERNEL);
@@ -174,9 +173,8 @@ int xrt_cu_scu_init(struct xrt_cu *xcu)
 	core->run_cnts = 0;
 	spin_lock_init(&core->cu_lock);
 	size = SOFT_KERNEL_REG_SIZE;
-	args.size = size;
-	args.flags = ZOCL_BO_FLAGS_CMA;
-	core->sc_bo = zocl_drm_create_bo(zdev->ddev, size, args.flags);
+	core->sc_bo = zocl_drm_create_bo(zdev->ddev, size, ZOCL_BO_FLAGS_CMA);
+	printk("sc_bo flags = %x\n",core->sc_bo->flags);
 	if (IS_ERR(core->sc_bo))
 		goto err;
 	core->vaddr = core->sc_bo->cma_base.vaddr;

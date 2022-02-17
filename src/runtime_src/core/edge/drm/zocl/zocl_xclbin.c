@@ -859,13 +859,6 @@ zocl_xclbin_load_pskernel(struct drm_zocl_dev *zdev, void *data)
 	size_of_header = sizeof(struct axlf_section_header);
 	num_of_sections = axlf_head->m_header.m_numSections-1;
 	xclbin = (char __user *)axlf;
-	ret =
-	    !ZOCL_ACCESS_OK(VERIFY_READ, xclbin, axlf_head->m_header.m_length);
-	if (ret) {
-		ret = -EFAULT;
-		goto out;
-	}
-
 	if (zocl_xclbin_get_uuid(slot) != NULL) {
 		if (zdev->aie) {
 			/*
@@ -908,8 +901,10 @@ zocl_xclbin_load_pskernel(struct drm_zocl_dev *zdev, void *data)
 out:
 	write_unlock(&zdev->attr_rwlock);
 	vfree(aie_res);
-	DRM_INFO("%s %pUb ret: %d", __func__, zocl_xclbin_get_uuid(slot),
-		ret);
+	if (!ret)
+		DRM_INFO("%s %pUb ret: %d", __func__, zocl_xclbin_get_uuid(slot), ret);
+	else
+		DRM_INFO("%s ret: %d", __func__, ret);
 	mutex_unlock(&slot->slot_xclbin_lock);
 	return ret;
 }

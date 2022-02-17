@@ -107,7 +107,6 @@ void configSoftKernel(xclDeviceHandle handle, xclSKCmd *cmd)
       }
 
       /* Start the soft kernel loop for each CU. */
-      syslog(LOG_INFO, "Metadata BO handle = 0x%x, SK BO handle = %d\n", cmd->meta_bohdl, cmd->bohdl);
       xrt::skd* skd_inst = new xrt::skd(handle,cmd->meta_bohdl,cmd->bohdl,cmd->krnl_name,i,cmd->uuid);
       ret = skd_inst->init();
       if(ret) {

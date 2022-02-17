@@ -472,7 +472,7 @@ struct drm_zocl_aie_cmd {
  */
 struct drm_zocl_sk_create {
 	uint32_t	cu_idx;
-	uint32_t	handle;
+	int		handle;
 };
 
 /**

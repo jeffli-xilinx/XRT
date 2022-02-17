@@ -236,12 +236,15 @@ struct kds_scu_info
       boost::char_separator<char> sep(",");
       tokenizer tokens(line, sep);
 
-      if (std::distance(tokens.begin(), tokens.end()) != 4)
+      std::cout << "cu_stat = " << line << std::endl;
+      
+      if (std::distance(tokens.begin(), tokens.end()) != 5)
         throw xrt_core::query::sysfs_error("PS kernel statistic sysfs node corrupted");
 
       data_type data;
       const int radix = 16;
       tokenizer::iterator tok_it = tokens.begin();
+      data.slot  = std::stoi(std::string(*tok_it++));
       data.index  = std::stoi(std::string(*tok_it++));
       data.name   = std::string(*tok_it++);  // kernel name
       data.status = std::stoul(std::string(*tok_it++), nullptr, radix);

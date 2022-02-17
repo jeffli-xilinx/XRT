@@ -97,7 +97,7 @@ class skd
     void* sk_handle;
     void* kernel;
     std::vector<xrt_core::xclbin::kernel_argument> args;
-    unsigned int cmd_boh;
+    int cmd_boh = -1;
     uint32_t *args_from_host;
     ffi_type** ffi_args;
     ffi_cif cif;
@@ -107,7 +107,7 @@ class skd
     int waitNextCmd();
     int createSoftKernelFile(xclDeviceHandle handle, int bohdl);
     int deleteSoftKernelFile();
-    int createSoftKernel(unsigned int *boh);
+    int createSoftKernel(int *boh);
     ffi_type* convert_to_ffitype(xrt_core::xclbin::kernel_argument arg);
 };
 

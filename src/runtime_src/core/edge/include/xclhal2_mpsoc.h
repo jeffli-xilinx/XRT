@@ -100,7 +100,7 @@ XCL_DRIVER_DLLESPEC int xclAIEPutCmd(xclDeviceHandle handle, xclAIECmd *cmd);
  * @cu_idx:        CU index
  * Return:         0 on success or appropriate error number
  */
-XCL_DRIVER_DLLESPEC int xclSKCreate(xclDeviceHandle handle, unsigned int boHandle, uint32_t cu_idx);
+XCL_DRIVER_DLLESPEC int xclSKCreate(xclDeviceHandle handle, int *boHandle, uint32_t cu_idx);
 
 /**
  * xclSKReport() - Report a soft kernel compute unit state change

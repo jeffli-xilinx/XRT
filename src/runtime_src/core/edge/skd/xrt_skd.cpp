@@ -42,7 +42,6 @@ namespace xrt {
     // Set sk_path according to sk_name
     snprintf(sk_path, XRT_MAX_PATH_LENGTH, "%s%s%d", SOFT_KERNEL_FILE_PATH,
 	     sk_name,cu_idx);
-    syslog(LOG_INFO, "Starting skd instance with kernel name %s, CU index %d, SK BO %0d, Meta BO %0d, uuid %x, path %s\n",sk_name, cu_idx, sk_bo, sk_meta_bo, xclbin_uuid, sk_path);
   }
 
   XCL_DRIVER_DLLESPEC
@@ -83,15 +82,9 @@ namespace xrt {
     }
     args = xrt_core::xclbin::get_kernel_arguments((char *)buf,prop.size,sk_name);
     num_args = args.size();
+    syslog(LOG_INFO,"Num args = %d\n",num_args);
     munmap(buf, prop.size);
     
-    // Create soft kernel subdev
-    ret = createSoftKernel(&cmd_boh);
-    if (ret) {
-      syslog(LOG_ERR, "Cannot create soft kernel.");
-      return -1;
-    }
-
     // Check for soft kernel init function
     kernel_init_t kernel_init;
     char sk_init[PS_KERNEL_NAME_LENGTH+5];
@@ -115,11 +108,23 @@ namespace xrt {
     
     // Open main soft kernel
     kernel = dlsym(sk_handle, sk_name);
+    errstr = dlerror();
+    if(errstr != NULL) {
+      syslog(LOG_ERR, "Dynamic Link error: %s\n", errstr);
+      return -1;
+    }
     if (!kernel) {
       syslog(LOG_ERR, "Cannot find kernel %s\n", sk_name);
       return -1;
     }
     
+    // Soft kernel command bohandle init
+    ret = createSoftKernel(&cmd_boh);
+    if (ret) {
+      syslog(LOG_ERR, "Cannot create soft kernel.");
+      return -1;
+    }
+
     syslog(LOG_INFO, "%s_%d start running\n", sk_name, cu_idx);
     
     args_from_host = (unsigned *)xclMapBO(devHdl, cmd_boh, true);;
@@ -206,7 +211,7 @@ namespace xrt {
     // Call soft kernel fini if available
     kernel_fini_t kernel_fini;
     char sk_fini[PS_KERNEL_NAME_LENGTH+5];
-    int ret;
+    int ret = 0;
     snprintf(sk_fini,PS_KERNEL_NAME_LENGTH+5,"%s%s",sk_name,"_fini");
     kernel_fini = (kernel_fini_t)dlsym(sk_handle, sk_fini);
     if (!kernel_fini) {
@@ -220,19 +225,21 @@ namespace xrt {
     if (ret) {
       syslog(LOG_ERR, "Cannot remove soft kernel file %s\n", sk_path);
     }
-    xclBOProperties prop;
-    if (xclGetBOProperties(devHdl, cmd_boh, &prop)) {
-    }
-    ret = munmap(args_from_host,prop.size);
-    if (ret) {
-      syslog(LOG_ERR, "Cannot munmap BO %d, at %p\n", cmd_boh, &args_from_host);
+    if(cmd_boh >= 0) {
+      xclBOProperties prop;
+      if (xclGetBOProperties(devHdl, cmd_boh, &prop)) {
+      }
+      ret = munmap(args_from_host,prop.size);
+      if (ret) {
+	syslog(LOG_ERR, "Cannot munmap BO %d, at %p\n", cmd_boh, &args_from_host);
+      }
     }
     xclClose(devHdl);
   }
 
-  int skd::createSoftKernel(unsigned int *boh) {
+  int skd::createSoftKernel(int *boh) {
     int ret;
-    ret = xclSKCreate(devHdl, *boh, cu_idx);
+    ret = xclSKCreate(devHdl, boh, cu_idx);
     return ret;
   }
   int skd::waitNextCmd() {

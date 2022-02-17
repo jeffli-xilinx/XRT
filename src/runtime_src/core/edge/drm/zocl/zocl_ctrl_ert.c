@@ -668,7 +668,7 @@ static int zert_probe(struct platform_device *pdev)
 	ret = data->zced_dev_init(zert);
 	if (ret)
 		return ret;
-
+	
 	zert->zce_cu_xgq_ring_start = zert->zce_cq_start + sizeof(struct zocl_ert_cq);
 	zert->zce_cu_xgq_ring_size = zert->zce_cq_size - sizeof(struct zocl_ert_cq);
 	/* Remap CQ to just what we need. The rest will be passed onto CU XGQ drivers. */
