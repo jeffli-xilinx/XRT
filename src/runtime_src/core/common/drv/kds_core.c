@@ -83,7 +83,7 @@ ssize_t show_kds_custat_raw(struct kds_sched *kds, char *buf)
 ssize_t show_kds_scustat_raw(struct kds_sched *kds, char *buf)
 {
 	struct kds_scu_mgmt *scu_mgmt = &kds->scu_mgmt;
-	char *cu_fmt = "%d,%d,%s,0x%x,%u\n";
+	char *cu_fmt = "%d,%d,%s:%s,0x%x,%u\n";
 	struct xrt_cu *xcu = NULL;
 	ssize_t sz = 0;
 	int i;
@@ -115,7 +115,7 @@ ssize_t show_kds_scustat_raw(struct kds_sched *kds, char *buf)
 				continue;
 
 			sz += scnprintf(buf+sz, PAGE_SIZE - sz, cu_fmt, j,
-					(i | SCU_DOMAIN), xcu->info.iname,
+					(i | SCU_DOMAIN), xcu->info.kname,xcu->info.iname,
 					xcu->status,
 					cu_stat_read(scu_mgmt,usage[i]));
 		}
