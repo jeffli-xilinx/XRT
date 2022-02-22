@@ -29,6 +29,7 @@
 #include <syslog.h>
 
 #include "xclhal2_mpsoc.h"
+#include "xrt_skd.h"
 
 xclDeviceHandle initXRTHandle(unsigned deviceIndex);
 void configSoftKernel(xclDeviceHandle handle, xclSKCmd *cmd);

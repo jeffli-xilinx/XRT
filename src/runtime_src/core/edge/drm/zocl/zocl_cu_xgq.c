@@ -466,19 +466,22 @@ zcu_xgq_cmd_start_cuidx(struct zocl_cu_xgq *zcu_xgq, struct xgq_cmd_sq_hdr *cmd)
 	xcmd->cb.notify_host = zcu_xgq_cmd_notify;
 	xcmd->cb.free = kds_free_command;
 	xcmd->priv = zcu_xgq;
-	if (cmd->cu_domain != 0)
-		xcmd->type = KDS_SCU;
-	else
-		xcmd->type = KDS_CU;
-	xcmd->opcode = OP_START;
 	xcmd->response_size = 0;
 
 	if (ZCU_XGQ_FAST_PATH(zcu_xgq)) {
+		cmd->cu_domain = zcu_xgq->zxc_cu_domain;
 		mask_idx = zcu_xgq->zxc_cu_idx / 32;
 		bit_idx = zcu_xgq->zxc_cu_idx % 32;
 	} else {
 		mask_idx = cmd->cu_idx / 32;
 		bit_idx = cmd->cu_idx % 32;
+	}
+	if (cmd->cu_domain != 0) {
+		xcmd->type = KDS_SCU;
+		xcmd->opcode = OP_START_SK;
+	} else {
+		xcmd->type = KDS_CU;
+		xcmd->opcode = OP_START;
 	}
 	xcmd->cu_mask[mask_idx] = 1 << bit_idx;
 	if (mask_idx < 4) {

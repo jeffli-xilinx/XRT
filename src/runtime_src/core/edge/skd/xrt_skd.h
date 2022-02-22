@@ -86,10 +86,11 @@ class skd
 
  private:
     xclDeviceHandle devHdl;
+    xrtDeviceHandle xrtdHdl;
     char sk_path[XRT_MAX_PATH_LENGTH];
     uint32_t cu_idx;
     char sk_name[PS_KERNEL_NAME_LENGTH];
-    pscontext* xrtHandle;
+    pscontext* xrtHandle = NULL;
     int sk_bo;
     int sk_meta_bo;
     char xclbin_uuid[16];

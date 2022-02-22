@@ -18,6 +18,7 @@
 #include "ps_kernel.h"
 #include "xgq_execbuf.h"
 
+#define KDS_VERBOSE
 #ifdef KDS_VERBOSE
 #define print_ecmd_info(ecmd) \
 do {\
@@ -173,8 +174,12 @@ xocl_ctx_to_info(struct drm_xocl_ctx *args, struct kds_ctx_info *info)
 	if (args->cu_index == XOCL_CTX_VIRT_CU_INDEX)
 		info->cu_idx = CU_CTX_VIRT_CU;
 	else
-		info->cu_idx = args->cu_index;
+		info->cu_idx = args->cu_index & 0xffff;
 
+	if ((args->cu_index & SCU_DOMAIN) != 0) {
+		info->cu_domain = (SCU_DOMAIN >> 16);
+	}
+	
 	if (args->flags == XOCL_CTX_EXCLUSIVE)
 		info->flags = CU_CTX_EXCLUSIVE;
 	else
@@ -448,6 +453,52 @@ static void notify_execbuf(struct kds_command *xcmd, int status)
 	}
 }
 
+static void notify_execbuf_xgq(struct kds_command *xcmd, int status)
+{
+	struct kds_client *client = xcmd->client;
+	struct ert_packet *ecmd = (struct ert_packet *)xcmd->u_execbuf;
+
+	if (xcmd->opcode == OP_GET_STAT)
+		read_ert_stat(xcmd);
+
+	if (status == KDS_COMPLETED)
+		ecmd->state = ERT_CMD_STATE_COMPLETED;
+	else if (status == KDS_ERROR)
+		ecmd->state = ERT_CMD_STATE_ERROR;
+	else if (status == KDS_TIMEOUT)
+		ecmd->state = ERT_CMD_STATE_TIMEOUT;
+	else if (status == KDS_ABORT)
+		ecmd->state = ERT_CMD_STATE_ABORT;
+
+	if (xcmd->timestamp_enabled) {
+		/* Only start kernel command supports timestamps */
+		struct ert_start_kernel_cmd *scmd;
+		struct cu_cmd_state_timestamps *ts;
+
+		scmd = (struct ert_start_kernel_cmd *)ecmd;
+		ts = ert_start_kernel_timestamps(scmd);
+		ts->skc_timestamps[ERT_CMD_STATE_NEW] = xcmd->timestamp[KDS_NEW];
+		ts->skc_timestamps[ERT_CMD_STATE_QUEUED] = xcmd->timestamp[KDS_QUEUED];
+		ts->skc_timestamps[ERT_CMD_STATE_RUNNING] = xcmd->timestamp[KDS_RUNNING];
+		ts->skc_timestamps[ecmd->state] = xcmd->timestamp[status];
+	}
+
+	XOCL_DRM_GEM_OBJECT_PUT_UNLOCKED(xcmd->gem_obj);
+	kfree(xcmd->execbuf);
+
+	if (xcmd->cu_idx >= 0)
+		client_stat_inc(client, c_cnt[xcmd->cu_idx]);
+
+	if (xcmd->inkern_cb) {
+		int error = (status == ERT_CMD_STATE_COMPLETED)?0:-EFAULT;
+		xcmd->inkern_cb->func((unsigned long)xcmd->inkern_cb->data, error);
+		kfree(xcmd->inkern_cb);
+	} else {
+		atomic_inc(&client->event);
+		wake_up_interruptible(&client->waitq);
+	}
+}
+
 static bool copy_and_validate_execbuf(struct xocl_dev *xdev,
 				     struct drm_xocl_bo *xobj,
 				     struct ert_packet *ecmd)
@@ -535,11 +586,11 @@ static int xocl_fill_payload_xgq(struct xocl_dev *xdev, struct kds_command *xcmd
 	case ERT_SK_START:
 		kecmd = (struct ert_start_kernel_cmd *)xcmd->execbuf;
 		xcmd->type = KDS_SCU;
-		xcmd->opcode = OP_START;
+		xcmd->opcode = OP_START_SK;
 		xcmd->cu_mask[0] = kecmd->cu_mask;
 		memcpy(&xcmd->cu_mask[1], kecmd->data, kecmd->extra_cu_masks);
 		xcmd->num_mask = 1 + kecmd->extra_cu_masks;
-		xcmd->isize = xgq_exec_convert_start_cu_cmd(xcmd->info, kecmd);
+		xcmd->isize = xgq_exec_convert_start_scu_cmd(xcmd->info, kecmd);
 		ret = 1; /* hack */
 		break;
 	case ERT_START_CU:
@@ -675,7 +726,7 @@ static int xocl_command_ioctl(struct xocl_dev *xdev, void *data,
 		goto out;
 	}
 	xcmd->cb.free = kds_free_command;
-	xcmd->cb.notify_host = notify_execbuf;
+//	xcmd->cb.notify_host = notify_execbuf;
 	/* xcmd->execbuf points to kernel space copy */
 	xcmd->execbuf = (u32 *)ecmd;
 	/* xcmd->u_execbuf points to user's original for write back/notice */
@@ -686,11 +737,14 @@ static int xocl_command_ioctl(struct xocl_dev *xdev, void *data,
 	print_ecmd_info(ecmd);
 
 	if (XDEV(xdev)->kds.xgq_enable) {
+		xcmd->cb.notify_host = notify_execbuf_xgq;
 		ret = xocl_fill_payload_xgq(xdev, xcmd, filp);
 		if (ret > 0)
 			goto out2;
 		goto out1;
 	}
+	
+	xcmd->cb.notify_host = notify_execbuf;
 
 	/* xcmd->type is the only thing determine who to handle this command.
 	 * If ERT is supported, use ERT as default handler.

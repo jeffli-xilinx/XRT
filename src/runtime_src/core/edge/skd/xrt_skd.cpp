@@ -34,6 +34,7 @@ namespace xrt {
   skd::skd(xclDeviceHandle handle, int sk_meta_bohdl, int sk_bohdl, char *kname, uint32_t cu_index, char *uuid) {
     strcpy(sk_name,kname);
     devHdl = handle;
+    xrtdHdl = xrt::device(handle);
     cu_idx = cu_index;
     sk_bo = sk_bohdl;
     sk_meta_bo = sk_meta_bohdl;
@@ -95,14 +96,19 @@ namespace xrt {
       syslog(LOG_INFO, "kernel init function %s not found\n", sk_init);
     } else {
       int ret;
-      ret = xrtDeviceLoadXclbinUUID(devHdl,reinterpret_cast<unsigned char*>(xclbin_uuid));
+      ret = xrtDeviceLoadXclbinUUID(xrtdHdl,reinterpret_cast<unsigned char*>(xclbin_uuid));
       if(ret) {
 	syslog(LOG_ERR, "Cannot load xclbin from UUID!\n");
 	return -1;
       }
-      xrtHandle = kernel_init(devHdl,reinterpret_cast<unsigned char*>(xclbin_uuid));
-      pass_xrtHandles = true;
-      syslog(LOG_INFO, "kernel init function found! Will pass xrtHandles to soft kernel\n");
+      xrtHandle = kernel_init(xrtdHdl,reinterpret_cast<unsigned char*>(xclbin_uuid));
+      if(xrtHandle) {
+	pass_xrtHandles = true;
+	syslog(LOG_INFO, "kernel init function found! Will pass xrtHandles to soft kernel\n");
+      } else {
+	syslog(LOG_ERR, "kernel init function did not return valid xrtHandles!\n");
+	return -1;
+      }
     }
     ffi_args = new ffi_type*[num_args];
     
@@ -125,7 +131,7 @@ namespace xrt {
       return -1;
     }
 
-    syslog(LOG_INFO, "%s_%d start running\n", sk_name, cu_idx);
+    syslog(LOG_INFO, "%s_%d start running, cmd_boh = %d\n", sk_name, cu_idx, cmd_boh);
     
     args_from_host = (unsigned *)xclMapBO(devHdl, cmd_boh, true);;
     if (args_from_host == MAP_FAILED) {
@@ -136,7 +142,11 @@ namespace xrt {
     
     // Prep FFI type for all kernel arguments
     for(int i=0;i<num_args;i++) {
-      ffi_args[i] = convert_to_ffitype(args[i]);
+      //      if((args[i].index == xrt_core::xclbin::kernel_argument::no_index) && (args[i].hosttype.compare("xrtHandles*")==0)) {
+      //	syslog(LOG_ERR, "ERROR: xrtHandles not initialized!  No kernel init function found!\n");
+      //	return -1;
+      //      } else
+	ffi_args[i] = convert_to_ffitype(args[i]);
     }
     
     if(ffi_prep_cif(&cif,FFI_DEFAULT_ABI, num_args, &ffi_type_uint32,ffi_args) != FFI_OK) {
@@ -144,6 +154,7 @@ namespace xrt {
       return -1;
     }    
 
+    syslog(LOG_INFO,"Finish soft kernel %s init\n",sk_name);
     return 0;
   }
 
@@ -178,6 +189,10 @@ namespace xrt {
       // Map buffers used by kernel
       for(int i=0;i<num_args;i++) {
 	if((args[i].index == xrt_core::xclbin::kernel_argument::no_index) && (args[i].hosttype.compare("xrtHandles*")==0)) {
+	//	  if(!pass_xrtHandles) {
+	//	    syslog(LOG_ERR, "xrtHandles not initialized!  No kernel init function found!\n");
+	//	    break;
+	//	  }
 	  ffi_arg_values[i] = &xrtHandle;
 	} else if(args[i].type == xrt_core::xclbin::kernel_argument::argtype::global) {
 	  uint64_t *buf_addr_ptr = (uint64_t*)(&args_from_host[args[i].offset/4]);

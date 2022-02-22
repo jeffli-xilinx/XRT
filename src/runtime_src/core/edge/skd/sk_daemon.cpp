@@ -25,7 +25,6 @@
 #include <sys/prctl.h>
 
 #include "sk_daemon.h"
-#include "xrt_skd.h"
 #include "core/common/config_reader.h"
 #include "core/common/message.h"
 #include "core/edge/user/shim.h"

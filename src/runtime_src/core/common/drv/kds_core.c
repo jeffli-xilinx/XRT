@@ -176,7 +176,9 @@ static int kds_polling_thread(void *data)
 {
 	struct kds_sched *kds = (struct kds_sched *)data;
 	struct kds_cu_mgmt *cu_mgmt = &kds->cu_mgmt;
+	struct kds_scu_mgmt *scu_mgmt = &kds->scu_mgmt;
 	struct xrt_cu **xcus = cu_mgmt->xcus;
+	struct xrt_cu **xscus = scu_mgmt->xcus;
 	int busy_cnt = 0;
 	int loop_cnt = 0;
 	int cu_idx = 0;
@@ -188,6 +190,12 @@ static int kds_polling_thread(void *data)
 				continue;
 
 			if (xrt_cu_process_queues(xcus[cu_idx]) == XCU_BUSY)
+				busy_cnt += 1;
+		}
+		for (cu_idx = 0; cu_idx < MAX_CUS; cu_idx++) {
+			if (!xscus[cu_idx])
+				continue;
+			if (xrt_cu_process_queues(xscus[cu_idx]) == XCU_BUSY)
 				busy_cnt += 1;
 		}
 
@@ -373,7 +381,7 @@ acquire_scu_idx(struct kds_scu_mgmt *scu_mgmt, struct kds_command *xcmd)
 
 	/* Check if CU is added in the context */
 	for (i = 0; i < num_marked; ++i) {
-		if (test_bit(user_cus[i], client->cu_bitmap)) {
+		if (test_bit(user_cus[i], client->scu_bitmap)) {
 			valid_cus[num_valid] = user_cus[i];
 			++num_valid;
 		}
@@ -400,7 +408,7 @@ out:
 	client_stat_inc(client, scu_s_cnt[index]);
 	xcmd->cu_idx = index;
 	/* Before it go, make sure selected CU is still opening. */
-	if (unlikely(!test_bit(index, client->cu_bitmap))) {
+	if (unlikely(!test_bit(index, client->scu_bitmap))) {
 		client_stat_dec(client, scu_s_cnt[index]);
 		index = -EAGAIN;
 	}
@@ -774,13 +782,6 @@ kds_add_scu_context(struct kds_sched *kds, struct kds_client *client,
 	bool shared;
 	int ret = 0;
 
-	if (info->cu_idx < MAX_CUS) {
-		kds_err(client, "SCU cu_idx %d not valid.  SCU should start from %d", info->cu_idx, MAX_CUS);
-		return -EINVAL;
-	} else {
-		cu_idx = info->cu_idx & ~(SCU_DOMAIN);
-	}
-
 	if ((cu_idx >= MAX_CUS) || (!scu_mgmt->xcus[cu_idx])) {
 		kds_err(client, "SCU(%d) not found", cu_idx);
 		return -EINVAL;
@@ -832,13 +833,6 @@ kds_del_scu_context(struct kds_sched *kds, struct kds_client *client,
 	u32 cu_idx = 0;
 	unsigned long submitted = 0;
 	unsigned long completed = 0;
-
-	if (info->cu_idx < MAX_CUS) {
-		kds_err(client, "SCU cu_idx %d not valid.  SCU should start from %d", info->cu_idx, MAX_CUS);
-		return -EINVAL;
-	} else {
-		cu_idx = info->cu_idx & ~(SCU_DOMAIN);
-	}
 
 	if ((cu_idx >= MAX_CUS) || (!scu_mgmt->xcus[cu_idx])) {
 		kds_err(client, "SCU(%d) not found", cu_idx);
@@ -1082,7 +1076,7 @@ int kds_add_command(struct kds_sched *kds, struct kds_command *xcmd)
 	BUG_ON(!xcmd->cb.free);
 
 	/* TODO: Check if command is blocked */
-
+	
 	/* Command is good to submit */
 	switch (xcmd->type) {
 	case KDS_CU:
@@ -1157,7 +1151,7 @@ int kds_init_client(struct kds_sched *kds, struct kds_client *client)
  * per the kds context argument.
  */
 static bool
-is_cu_in_ctx_slot(struct kds_sched *kds, struct kds_client_ctx *cctx, u32 bit)
+is_cu_in_ctx_slot(struct kds_sched *kds, struct kds_client_ctx *cctx, u32 bit, u32 cu_domain)
 {
 	struct xrt_cu *xcu = NULL;
 
@@ -1192,8 +1186,9 @@ _kds_fini_client(struct kds_sched *kds, struct kds_client *client,
 	bit = find_first_bit(client->cu_bitmap, MAX_CUS);
 	while (bit < MAX_CUS) {
 		/* Check whether this CU belongs to current slot */
-		if (is_cu_in_ctx_slot(kds, cctx, bit)) {
+	        if (is_cu_in_ctx_slot(kds, cctx, bit, 0)) {
 			info.cu_idx = bit;
+			info.cu_domain = 0;
 			info.curr_ctx = cctx;
 			kds_del_context(kds, client, &info);
 		}
@@ -1203,8 +1198,9 @@ _kds_fini_client(struct kds_sched *kds, struct kds_client *client,
 	bit = find_first_bit(client->scu_bitmap, MAX_CUS);
 	while (bit < MAX_CUS) {
 		/* Check whether this SCU belongs to current slot */
-		if (is_cu_in_ctx_slot(kds, cctx, bit & ~(SCU_DOMAIN))) {
-			info.cu_idx = bit | SCU_DOMAIN;
+	        if (is_cu_in_ctx_slot(kds, cctx, bit, (SCU_DOMAIN>>16))) {
+			info.cu_idx = bit;
+			info.cu_domain = (SCU_DOMAIN>>16);
 			info.curr_ctx = cctx;
 			kds_del_context(kds, client, &info);
 		}
@@ -1271,7 +1267,7 @@ int kds_add_context(struct kds_sched *kds, struct kds_client *client,
 		}
 		++cctx->virt_cu_ref;
 	} else {
-	     if (cu_idx >= MAX_CUS) {
+	     if (info->cu_domain == (SCU_DOMAIN>>16)) {
 		if (kds_add_scu_context(kds, client, info))
 			return -EINVAL;
 	     } else {
@@ -1316,7 +1312,7 @@ int kds_del_context(struct kds_sched *kds, struct kds_client *client,
 			mutex_unlock(&kds->cu_mgmt.lock);
 		}
 	} else {
-	     if (cu_idx >= MAX_CUS) {
+	     if (info->cu_domain >= (SCU_DOMAIN>>16)) {
 		if (kds_del_scu_context(kds, client, info))
 			return -EINVAL;
 	     } else {
