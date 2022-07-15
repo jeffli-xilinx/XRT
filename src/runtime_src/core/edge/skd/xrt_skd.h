@@ -37,6 +37,9 @@
 #include <vector>
 
 
+#include "core/common/api/device_int.h"
+#include "core/common/device.h"
+#include "core/common/query_requests.h"
 #include "core/common/xclbin_parser.h"
 #include "ffi.h"
 #include "ps_kernel.h"
@@ -68,7 +71,7 @@ class skd
    * @param soft kernel CU index
    *
    */
-  skd(xclDeviceHandle handle, int sk_meta_bohdl, int sk_bohdl, char *kname, uint32_t cu_index, unsigned char *uuid);
+  skd(xclDeviceHandle handle, int sk_meta_bohdl, int sk_bohdl, char *kname, uint32_t cu_index, unsigned char *uuid, int parent_mem_bo_in, uint64_t mem_start_paddr_in, uint64_t mem_size_in);
   ~skd();
 
   XCL_DRIVER_DLLESPEC
@@ -97,6 +100,10 @@ class skd
     pscontext* xrtHandle = NULL;
     int sk_bo;
     int sk_meta_bo;
+    int parent_bo_handle;
+    uint64_t mem_start_paddr;
+    uint64_t mem_size;
+    void* mem_start_vaddr;
     unsigned char xclbin_uuid[16];
 
     void* sk_handle;

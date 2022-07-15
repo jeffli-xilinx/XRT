@@ -20,6 +20,9 @@
 #include <errno.h>
 #include <unistd.h>
 
+#include "core/common/api/device_int.h"
+#include "core/common/device.h"
+#include "core/common/query_requests.h"
 #include "sk_daemon.h"
 #include "xclhal2_mpsoc.h"
 #include "ert.h"
@@ -75,6 +78,22 @@ int main(int argc, char *argv[])
     exit(EXIT_FAILURE);
   }
 
+  // Map entire PS reserve memory space
+  uint64_t mem_start_paddr;
+  uint64_t mem_size;
+  int parent_mem_bo;
+  xrtDeviceHandle xrtdHdl = xrtDeviceOpenFromXcl(handle);
+  try {
+    mem_size = xrt_core::device_query<xrt_core::query::host_mem_size>(xrt_core::device_int::get_core_device(xrtdHdl));
+    mem_start_paddr = xrt_core::device_query<xrt_core::query::host_mem_addr>(xrt_core::device_int::get_core_device(xrtdHdl));
+    parent_mem_bo = xclGetHostBO(handle,mem_start_paddr,mem_size);
+    syslog(LOG_INFO, "host_mem_size=%ld, host_mem_address=%lx\n",mem_size, mem_start_paddr);
+  }
+  catch (const xrt_core::query::exception& ex) {
+    syslog(LOG_ERR, "host_mem_size not found!\n");
+    syslog(LOG_ERR, "exception msg: %s", ex.what());
+  }
+
   while (1) {
     /* Calling XRT interface to wait for commands */
     if (xclSKGetCmd(handle, &cmd) != 0)
@@ -82,7 +101,7 @@ int main(int argc, char *argv[])
 
     switch (cmd.opcode) {
     case ERT_SK_CONFIG:
-      configSoftKernel(handle, &cmd);
+      configSoftKernel(handle, &cmd, parent_mem_bo, mem_start_paddr, mem_size);
       break;
     default:
       syslog(LOG_WARNING, "Unknow management command, ignore it");
@@ -90,6 +109,7 @@ int main(int argc, char *argv[])
     }
   }
 
+  xclFreeBO(handle,parent_mem_bo);
   xclClose(handle);
   syslog(LOG_INFO, "Daemon stop\n");
   closelog();

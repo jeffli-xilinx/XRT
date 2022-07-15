@@ -59,13 +59,17 @@ xrt::skd* skd_inst = nullptr;
 static void sigLog(const int sig)
 {
   if(sig != SIGTERM) {
-    stacktrace_logger(sig);
+    //    stacktrace_logger(sig);
+    signal (sig, SIG_DFL);
+    if(skd_inst)
+      delete skd_inst;
+    exit(sig);
   }
   syslog(LOG_INFO,"Terminating PS kernel\n");
 }
 
 #define PNAME_LEN	(16)
-void configSoftKernel(xclDeviceHandle handle, xclSKCmd *cmd)
+void configSoftKernel(xclDeviceHandle handle, xclSKCmd *cmd, int parent_mem_bo, uint64_t mem_start_paddr, uint64_t mem_size)
 {
   pid_t pid;
   uint32_t i;
@@ -83,7 +87,7 @@ void configSoftKernel(xclDeviceHandle handle, xclSKCmd *cmd)
       char path[XRT_MAX_PATH_LENGTH];
       char proc_name[PNAME_LEN] = {};
       int ret;
-      skd_inst = new xrt::skd(handle,cmd->meta_bohdl,cmd->bohdl,cmd->krnl_name,i,cmd->uuid);
+      skd_inst = new xrt::skd(handle,cmd->meta_bohdl,cmd->bohdl,cmd->krnl_name,i,cmd->uuid, parent_mem_bo, mem_start_paddr, mem_size);
 
       /* Install Signal Handler for the Child Processes/Soft-Kernels */
       struct sigaction act;

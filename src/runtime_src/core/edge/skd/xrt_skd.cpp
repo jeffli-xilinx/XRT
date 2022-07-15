@@ -21,6 +21,9 @@
 # pragma GCC diagnostic ignored "-Wformat-truncation"
 #endif
 
+using ms_t = std::chrono::microseconds;
+using Clock = std::chrono::high_resolution_clock;
+
 namespace xrt {
 
   /**
@@ -35,13 +38,16 @@ namespace xrt {
    * @param soft kernel CU index
    *
    */
-  skd::skd(xclDeviceHandle handle, int sk_meta_bohdl, int sk_bohdl, char *kname, uint32_t cu_index, unsigned char *uuid) {
+  skd::skd(xclDeviceHandle handle, int sk_meta_bohdl, int sk_bohdl, char *kname, uint32_t cu_index, unsigned char *uuid, int parent_mem_bo_in, uint64_t mem_start_paddr_in, uint64_t mem_size_in) {
     strcpy(sk_name,kname);
     parent_devHdl = handle;
     cu_idx = cu_index;
     sk_bo = sk_bohdl;
     sk_meta_bo = sk_meta_bohdl;
     memcpy(xclbin_uuid,uuid,sizeof(xclbin_uuid));
+    parent_bo_handle = parent_mem_bo_in;
+    mem_start_paddr = mem_start_paddr_in;
+    mem_size = mem_size_in;
 
     // Set sk_path according to sk_name
     snprintf(sk_path, XRT_MAX_PATH_LENGTH, "%s%s%d", SOFT_KERNEL_FILE_PATH,
@@ -93,13 +99,21 @@ namespace xrt {
       return_offset = (args[num_args-1].offset+PS_KERNEL_REG_OFFSET+16)/4;
     else
       return_offset = (args[num_args-1].offset+PS_KERNEL_REG_OFFSET+((args[num_args-1].size>4)?8:4))/4;
+#ifdef SKD_DEBUG
     syslog(LOG_INFO,"Return offset = %d\n",return_offset);
     syslog(LOG_INFO,"Num args = %d\n",num_args);
-    munmap(buf, prop.size);
+#endif
+    xclUnmapBO(parent_devHdl, sk_meta_bo, buf);
 
     // new device handle for the current instance
     devHdl = xclOpen(0, NULL, XCL_QUIET);
     xrtdHdl = xrtDeviceOpenFromXcl(devHdl);
+
+    // Map entire PS reserve memory space
+    mem_start_vaddr = xclMapBO(parent_devHdl,parent_bo_handle,true);
+#ifdef SKD_DEBUG
+    syslog(LOG_INFO, "host_mem_size=%ld, host_mem_paddr=%lx, host_mem_vaddr=%p\n",mem_size, mem_start_paddr, &mem_start_vaddr);
+#endif
 
     // Check for soft kernel init function
     kernel_init_t kernel_init;
@@ -149,7 +163,9 @@ namespace xrt {
       return -1;
     }
 
+#ifdef SKD_DEBUG
     syslog(LOG_INFO, "%s_%d start running, cmd_boh = %d\n", sk_name, cu_idx, cmd_boh);
+#endif
 
     args_from_host = (unsigned *)xclMapBO(devHdl, cmd_boh, true);;
     if (args_from_host == MAP_FAILED) {
@@ -179,21 +195,27 @@ namespace xrt {
     int ret = 0;
     void* ffi_arg_values[num_args];
     // Buffer Objects
-    int boHandles[num_args];
+    uint64_t bo_offsets[num_args];
     void* bos[num_args];
-    uint64_t boSize[num_args];
-    std::vector<int> bo_list;
+    //    uint64_t boSize[num_args];
+    Clock::time_point start;
+    Clock::time_point end;
+    Clock::time_point cmd_start;
+    Clock::time_point cmd_end;
 
     while (1) {
       ret = waitNextCmd();
+      cmd_start = Clock::now();
+#ifdef SKD_DEBUG
+      if(cmd_end < cmd_start)
+	syslog(LOG_INFO, "PS Kernel Command interval = %ld us\n",(std::chrono::duration_cast<ms_t>(cmd_start - cmd_end)).count());
+#endif
 
       if (ret) {
 	/* We are told to exit the soft kernel loop */
 	syslog(LOG_INFO, "Exit soft kernel %s\n", sk_name);
 	break;
       }
-
-      syslog(LOG_INFO, "Got new kernel command!\n");
 
       /* Reg file indicates the kernel should not be running. */
       if (!(args_from_host[0] & 0x1))
@@ -207,31 +229,50 @@ namespace xrt {
 	} else if(args[i].type == xrt_core::xclbin::kernel_argument::argtype::global) {
 	  uint64_t *buf_addr_ptr = (uint64_t*)(&args_from_host[(args[i].offset+PS_KERNEL_REG_OFFSET)/4]);
 	  uint64_t buf_addr = reinterpret_cast<uint64_t>(*buf_addr_ptr);
-	  uint64_t *buf_size_ptr = (uint64_t*)(&args_from_host[(args[i].offset+PS_KERNEL_REG_OFFSET)/4+2]);
-	  uint64_t buf_size = reinterpret_cast<uint64_t>(*buf_size_ptr);
-	  boSize[i] = buf_size;
 
-	  boHandles[i] = xclGetHostBO(devHdl,buf_addr,buf_size);
-	  bos[i] = xclMapBO(devHdl,boHandles[i],true);
+	  Clock::time_point bo_start;
+	  Clock::time_point bo_gethostbo;
+	  Clock::time_point bo_mapbo;
+	  Clock::time_point bo_end;
+
+	  bo_start = Clock::now();
+	  bo_offsets[i] = buf_addr - mem_start_paddr;
+	  bo_gethostbo = Clock::now();
+	  bos[i] = mem_start_vaddr + bo_offsets[i];
+	  bo_mapbo = Clock::now();
 	  ffi_arg_values[i] = &bos[i];
-	  bo_list.emplace_back(i);
+	  bo_end = Clock::now();
+#ifdef SKD_DEBUG
+	  syslog(LOG_INFO, "BO duration = %ld us, GetHostBO = %ld us, MapBO = %ld us\n",(std::chrono::duration_cast<ms_t>(bo_end - bo_start)).count(), (std::chrono::duration_cast<ms_t>(bo_gethostbo - bo_start)).count(), (std::chrono::duration_cast<ms_t>(bo_mapbo - bo_gethostbo)).count());
+#endif
 	} else {
 	  ffi_arg_values[i] = &args_from_host[(args[i].offset+PS_KERNEL_REG_OFFSET)/4];
 	}
       }
 
+      start = Clock::now();
       ffi_call(&cif,FFI_FN(kernel), &kernel_return, ffi_arg_values);
+      end = Clock::now();
       args_from_host[return_offset] = (uint32_t)kernel_return;
 
-      // Unmap Buffers
-      for(auto i:bo_list) {
-	munmap(bos[i],boSize[i]);
-	xclFreeBO(devHdl,boHandles[i]);
-      }
-      bo_list.clear();
+#ifdef SKD_DEBUG
+      syslog(LOG_INFO, "PS Kernel duration = %ld us\n",(std::chrono::duration_cast<ms_t>(end - start)).count());
+#endif
 
+      cmd_end = Clock::now();
+#ifdef SKD_DEBUG
+      syslog(LOG_INFO, "PS Kernel Command duration = %ld us, Preproc = %ld us, Postproc = %ld us\n",(std::chrono::duration_cast<ms_t>(cmd_end - cmd_start)).count(), (std::chrono::duration_cast<ms_t>(start - cmd_start)).count(), (std::chrono::duration_cast<ms_t>(cmd_end - end)).count());
+#endif
     }
 
+    // Unmap mem BO
+    ret = xclUnmapBO(parent_devHdl, parent_bo_handle, mem_start_vaddr);
+    if (ret) {
+      syslog(LOG_ERR, "Cannot munmap mem BO %d, at %p\n", parent_bo_handle, mem_start_vaddr);
+    }
+    syslog(LOG_INFO, "Unmapped DDR BO\n");
+    syslog(LOG_INFO, "PS kernel %s run finished\n",sk_name);
+    std::cout << std::flush;
   }
 
   skd::~skd() {
@@ -251,19 +292,24 @@ namespace xrt {
       xclBOProperties prop;
       if (xclGetBOProperties(devHdl, cmd_boh, &prop)) {
       }
-      ret = munmap(args_from_host,prop.size);
+      ret = xclUnmapBO(devHdl, cmd_boh, args_from_host);
       if (ret) {
-	syslog(LOG_ERR, "Cannot munmap BO %d, at %p\n", cmd_boh, &args_from_host);
+    	syslog(LOG_ERR, "Cannot munmap BO %d, at %p\n", cmd_boh, &args_from_host);
       }
     }
+    syslog(LOG_INFO, "Unmapped command BO\n");
+    std::cout << std::flush;
 
     snprintf(sk_fini,PS_KERNEL_NAME_LENGTH+finiExtension.size(),"%s%s",sk_name,finiExtension.c_str());
     kernel_fini = (kernel_fini_t)dlsym(sk_handle, sk_fini);
     if (!kernel_fini) {
       syslog(LOG_INFO, "kernel fini function %s not found\n", sk_fini);
+      std::cout << std::flush;
     } else {
       ret = kernel_fini(xrtHandle);
     }
+    syslog(LOG_INFO, "Finished PS kernel fini function\n");
+    std::cout << std::flush;
 
     dlclose(sk_handle);
     ret = deleteSoftKernelFile();
@@ -271,8 +317,9 @@ namespace xrt {
       syslog(LOG_ERR, "Cannot remove soft kernel file %s\n", sk_path);
     }
     xclClose(devHdl);
-    xclClose(parent_devHdl);
     report_fini();
+    syslog(LOG_INFO, "End of PS kernel destructor\n");
+    std::cout << std::flush;
   }
 
   int skd::createSoftKernel(int *boh) {
@@ -314,7 +361,7 @@ namespace xrt {
     fptr = fopen(sk_path, "w+b");
     if (fptr == NULL) {
       syslog(LOG_ERR, "Cannot create file: %s\n", sk_path);
-      munmap(buf, prop.size);
+      xclUnmapBO(handle, bohdl, buf);
       return -1;
     }
 
@@ -322,13 +369,15 @@ namespace xrt {
     if (fwrite(buf, prop.size, 1, fptr) != 1) {
       syslog(LOG_ERR, "Fail to write to file %s.\n", sk_path);
       fclose(fptr);
-      munmap(buf, prop.size);
+      xclUnmapBO(handle, bohdl, buf);
       return -1;
     }
+#ifdef SKD_DEBUG
     syslog(LOG_INFO,"File created at %s\n", sk_path);
+#endif
 
     fclose(fptr);
-    munmap(buf, prop.size);
+    xclUnmapBO(handle, bohdl, buf);
 
     return 0;
   }
