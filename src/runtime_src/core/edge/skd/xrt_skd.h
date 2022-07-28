@@ -86,6 +86,7 @@ class skd
   void
   fini();
 
+  void set_signal(int sig);
   void report_ready();
   void report_crash();
   void report_fini();
@@ -105,7 +106,8 @@ class skd
     uint64_t mem_size;
     void* mem_start_vaddr;
     unsigned char xclbin_uuid[16];
-
+    int signal = 0;
+    
     void* sk_handle;
     void* kernel;
     std::vector<xrt_core::xclbin::kernel_argument> args;

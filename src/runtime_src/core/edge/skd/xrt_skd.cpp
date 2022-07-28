@@ -103,7 +103,7 @@ namespace xrt {
     syslog(LOG_INFO,"Return offset = %d\n",return_offset);
     syslog(LOG_INFO,"Num args = %d\n",num_args);
 #endif
-    xclUnmapBO(parent_devHdl, sk_meta_bo, buf);
+    munmap(buf, prop.size);
 
     // new device handle for the current instance
     devHdl = xclOpen(0, NULL, XCL_QUIET);
@@ -193,11 +193,12 @@ namespace xrt {
   skd::run() {
     int32_t kernel_return = 0;
     int ret = 0;
-    void* ffi_arg_values[num_args];
+    std::vector<void*> ffi_arg_values(num_args);
     // Buffer Objects
-    uint64_t bo_offsets[num_args];
-    void* bos[num_args];
-    //    uint64_t boSize[num_args];
+    std::vector<size_t> bo_offsets(num_args);
+    std::vector<void*> bos(num_args);
+    std::vector<size_t> bo_size(num_args);
+    std::vector<int> bo_list;
     Clock::time_point start;
     Clock::time_point end;
     Clock::time_point cmd_start;
@@ -208,10 +209,10 @@ namespace xrt {
       cmd_start = Clock::now();
 #ifdef SKD_DEBUG
       if(cmd_end < cmd_start)
-	syslog(LOG_INFO, "PS Kernel Command interval = %ld us\n",(std::chrono::duration_cast<ms_t>(cmd_start - cmd_end)).count());
+      	syslog(LOG_INFO, "PS Kernel Command interval = %ld us\n",(std::chrono::duration_cast<ms_t>(cmd_start - cmd_end)).count());
 #endif
 
-      if (ret) {
+      if (ret && (signal==SIGTERM)) {
 	/* We are told to exit the soft kernel loop */
 	syslog(LOG_INFO, "Exit soft kernel %s\n", sk_name);
 	break;
@@ -229,22 +230,18 @@ namespace xrt {
 	} else if(args[i].type == xrt_core::xclbin::kernel_argument::argtype::global) {
 	  uint64_t *buf_addr_ptr = (uint64_t*)(&args_from_host[(args[i].offset+PS_KERNEL_REG_OFFSET)/4]);
 	  uint64_t buf_addr = reinterpret_cast<uint64_t>(*buf_addr_ptr);
+	  uint64_t *buf_size_ptr = (uint64_t*)(&args_from_host[(args[i].offset+PS_KERNEL_REG_OFFSET)/4+2]);
+	  uint64_t buf_size = reinterpret_cast<uint64_t>(*buf_size_ptr);
 
-	  Clock::time_point bo_start;
-	  Clock::time_point bo_gethostbo;
-	  Clock::time_point bo_mapbo;
-	  Clock::time_point bo_end;
-
-	  bo_start = Clock::now();
+#ifdef SKD_MAP_BIG_BO
 	  bo_offsets[i] = buf_addr - mem_start_paddr;
-	  bo_gethostbo = Clock::now();
 	  bos[i] = mem_start_vaddr + bo_offsets[i];
-	  bo_mapbo = Clock::now();
-	  ffi_arg_values[i] = &bos[i];
-	  bo_end = Clock::now();
-#ifdef SKD_DEBUG
-	  syslog(LOG_INFO, "BO duration = %ld us, GetHostBO = %ld us, MapBO = %ld us\n",(std::chrono::duration_cast<ms_t>(bo_end - bo_start)).count(), (std::chrono::duration_cast<ms_t>(bo_gethostbo - bo_start)).count(), (std::chrono::duration_cast<ms_t>(bo_mapbo - bo_gethostbo)).count());
+#else
+	  bo_handles[i] = xclGetHostBO(devHdl,buf_addr,buf_size);
+	  bos[i] = xclMapBO(devHdl,bo_handles[i],true);
+	  bo_list.emplace_back(i);
 #endif
+	  ffi_arg_values[i] = &bos[i];
 	} else {
 	  ffi_arg_values[i] = &args_from_host[(args[i].offset+PS_KERNEL_REG_OFFSET)/4];
 	}
@@ -265,12 +262,6 @@ namespace xrt {
 #endif
     }
 
-    // Unmap mem BO
-    ret = xclUnmapBO(parent_devHdl, parent_bo_handle, mem_start_vaddr);
-    if (ret) {
-      syslog(LOG_ERR, "Cannot munmap mem BO %d, at %p\n", parent_bo_handle, mem_start_vaddr);
-    }
-    syslog(LOG_INFO, "Unmapped DDR BO\n");
     syslog(LOG_INFO, "PS kernel %s run finished\n",sk_name);
     std::cout << std::flush;
   }
@@ -287,6 +278,14 @@ namespace xrt {
     if((args_from_host[0] & 0x1) == 1) {
       report_crash();  // Function to report crash to kernel - not implemented yet in kernel space
     }
+#ifdef SKD_MAP_BIG_BO
+    // Unmap mem BO
+    ret = xclUnmapBO(parent_devHdl, parent_bo_handle, mem_start_vaddr);
+    if (ret) {
+      syslog(LOG_ERR, "Cannot munmap mem BO %d, at %p\n", parent_bo_handle, mem_start_vaddr);
+    }
+    syslog(LOG_INFO, "Unmapped DDR BO\n");
+#endif
     // Unmap command BO
     if(cmd_boh >= 0) {
       xclBOProperties prop;
@@ -329,6 +328,9 @@ namespace xrt {
   }
   int skd::waitNextCmd() {
     return xclSKReport(devHdl, cu_idx, XRT_SCU_STATE_DONE);
+  }
+  void skd::set_signal(int sig) {
+    signal = sig;
   }
 
   /*
