@@ -191,13 +191,14 @@ namespace xrt {
   XCL_DRIVER_DLLESPEC
   void
   skd::run() {
-    int32_t kernel_return = 0;
+    ffi_sarg kernel_return = 0;
     int ret = 0;
     std::vector<void*> ffi_arg_values(num_args);
     // Buffer Objects
     std::vector<size_t> bo_offsets(num_args);
     std::vector<void*> bos(num_args);
     std::vector<size_t> bo_size(num_args);
+    std::vector<int> bo_handles(num_args);
     std::vector<int> bo_list;
     Clock::time_point start;
     Clock::time_point end;
@@ -228,32 +229,43 @@ namespace xrt {
 	if((args[i].index == xrt_core::xclbin::kernel_argument::no_index) && (args[i].hosttype.compare("xrtHandles*")==0)) {
 	  ffi_arg_values[i] = &xrtHandle;
 	} else if(args[i].type == xrt_core::xclbin::kernel_argument::argtype::global) {
-	  uint64_t *buf_addr_ptr = (uint64_t*)(&args_from_host[(args[i].offset+PS_KERNEL_REG_OFFSET)/4]);
+	  uint64_t *buf_addr_ptr = (uint64_t*)(&args_from_host[(args[i].offset + PS_KERNEL_REG_OFFSET) / 4]);
 	  uint64_t buf_addr = reinterpret_cast<uint64_t>(*buf_addr_ptr);
-	  uint64_t *buf_size_ptr = (uint64_t*)(&args_from_host[(args[i].offset+PS_KERNEL_REG_OFFSET)/4+2]);
+	  uint64_t *buf_size_ptr = (uint64_t*)(&args_from_host[(args[i].offset + PS_KERNEL_REG_OFFSET) / 4 + 2]);
 	  uint64_t buf_size = reinterpret_cast<uint64_t>(*buf_size_ptr);
 
 #ifdef SKD_MAP_BIG_BO
 	  bo_offsets[i] = buf_addr - mem_start_paddr;
 	  bos[i] = mem_start_vaddr + bo_offsets[i];
 #else
-	  bo_handles[i] = xclGetHostBO(devHdl,buf_addr,buf_size);
+	  bo_size[i] = buf_size;
+	  bo_handles[i] = xclGetHostBO(devHdl, buf_addr, buf_size);
 	  bos[i] = xclMapBO(devHdl,bo_handles[i],true);
 	  bo_list.emplace_back(i);
 #endif
 	  ffi_arg_values[i] = &bos[i];
 	} else {
-	  ffi_arg_values[i] = &args_from_host[(args[i].offset+PS_KERNEL_REG_OFFSET)/4];
+	  ffi_arg_values[i] = &args_from_host[(args[i].offset + PS_KERNEL_REG_OFFSET) / 4];
 	}
       }
 
       start = Clock::now();
-      ffi_call(&cif,FFI_FN(kernel), &kernel_return, ffi_arg_values);
+      ffi_call(&cif,FFI_FN(kernel), &kernel_return, ffi_arg_values.data());
       end = Clock::now();
       args_from_host[return_offset] = (uint32_t)kernel_return;
 
 #ifdef SKD_DEBUG
       syslog(LOG_INFO, "PS Kernel duration = %ld us\n",(std::chrono::duration_cast<ms_t>(end - start)).count());
+#endif
+
+#ifdef SKD_MAP_BIG_BO
+#else
+      // Unmap Buffers
+      for(auto i:bo_list) {
+	munmap(bos[i],bo_size[i]);
+	xclFreeBO(devHdl,bo_handles[i]);
+      }
+      bo_list.clear();
 #endif
 
       cmd_end = Clock::now();
