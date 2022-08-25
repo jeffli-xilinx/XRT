@@ -341,7 +341,7 @@ if [[ $CPU != "aarch64" ]] && [[ $edge == 1 ]]; then
   mkdir -p $edge_dir
   cd $edge_dir
 
-  cmake_flags+=" -DCMAKE_BUILD_TYPE=Release"
+  cmake_flags+=" -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc-8 -DCMAKE_CXX_COMPILER=g++-8"
 
   if [[ $nocmake == 0 ]]; then
     echo "env XRT_NATIVE_BUILD=no $CMAKE $cmake_flags ../../src"
