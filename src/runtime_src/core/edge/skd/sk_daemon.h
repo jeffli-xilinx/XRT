@@ -2,6 +2,7 @@
  * Copyright (C) 2019-2022 Xilinx, Inc
  * Author(s): Min Ma	<min.ma@xilinx.com>
  *          : Larry Liu	<yliu@xilinx.com>
+ *          : Jeff Lin	<jeffli@xilinx.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License"). You may
  * not use this file except in compliance with the License. A copy of the
@@ -19,11 +20,13 @@
 #ifndef __SK_RUNNER_H_
 #define __SK_RUNNER_H_
 
+#include <boost/stacktrace.hpp>
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <errno.h>
+#include <signal.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <syslog.h>
