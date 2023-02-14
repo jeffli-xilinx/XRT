@@ -16,3 +16,6 @@ IF((${CMAKE_VERSION} VERSION_GREATER "3.7.2") AND (XRT_CLANG_TIDY STREQUAL "ON")
     set(CMAKE_CXX_CLANG_TIDY "clang-tidy")
   endif()
 endif()
+
+set(CPPCHECK_XML_OUTPUT "${PROJECT_BINARY_DIR}/analysis/cppcheck/cppcheck_analysis.xml")
+find_package(Cppcheck)
