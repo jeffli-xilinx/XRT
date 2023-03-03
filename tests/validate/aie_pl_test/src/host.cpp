@@ -224,6 +224,7 @@ bool run_pl_controller_aie2(xrt::device device, xrt::uuid uuid, std::string aie_
     std::cout << "start pl controller kernel" << std::endl;
 
     controller_r1.wait();
+    sender_receiver_r1.wait();
     // sync output memory
     out_bo1.sync(XCL_BO_SYNC_BO_FROM_DEVICE, mem_size_bytes, /*OFFSET=*/0);
     // post-processing data;
